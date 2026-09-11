@@ -218,3 +218,93 @@ export function Mark({ size = 58 }: { size?: number }) {
     </svg>
   )
 }
+
+// ---------------------------------------------------------------- añadidos
+
+export function Sheet({
+  title,
+  onClose,
+  children,
+}: {
+  title: string
+  onClose: () => void
+  children: ComponentChildren
+}) {
+  return (
+    <div style="position:fixed;inset:0;z-index:40;display:flex;flex-direction:column">
+      <div onClick={onClose} style="position:absolute;inset:0;background:rgba(16,21,24,.42)" />
+      <div style="position:relative;margin-top:auto;background:var(--card);border-radius:18px 18px 0 0;max-height:88vh;display:flex;flex-direction:column;max-width:34rem;width:100%;margin-left:auto;margin-right:auto">
+        <div style="flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 20px;border-bottom:1px solid var(--line)">
+          <span class="dsp" style="font-size:17px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{title}</span>
+          <button
+            type="button"
+            onClick={onClose}
+            style="background:none;border:0;color:var(--accent);font-weight:600;font-size:15px;cursor:pointer;white-space:nowrap"
+          >
+            Cerrar
+          </button>
+        </div>
+        <div style="overflow-y:auto;-webkit-overflow-scrolling:touch;padding:18px 20px calc(28px + env(safe-area-inset-bottom,0px))">
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export type TabId = 'hoy' | 'plan' | 'prog' | 'ajustes'
+
+const TAB_ICONS: Record<TabId, string> = {
+  hoy: 'M4 11.5 12 4l8 7.5M6 10v9h12v-9',
+  plan: 'M4 6h16M4 12h16M4 18h10',
+  prog: 'M4 19V5M4 19h16M8 16v-4M12 16V8M16 16v-6',
+  ajustes: 'M4 7h16M4 12h16M4 17h16M9 5v4M16 10v4M7 15v4',
+}
+
+export function TabBar({
+  active,
+  onChange,
+  labels,
+}: {
+  active: TabId
+  onChange: (t: TabId) => void
+  labels: Record<TabId, string>
+}) {
+  const tabs: TabId[] = ['hoy', 'plan', 'prog', 'ajustes']
+  return (
+    <nav
+      aria-label="Secciones"
+      style="position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--tabbar);backdrop-filter:saturate(180%) blur(18px);-webkit-backdrop-filter:saturate(180%) blur(18px);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)"
+    >
+      <div style="max-width:34rem;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)">
+        {tabs.map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            aria-pressed={active === tab}
+            onClick={() => onChange(tab)}
+            style={`background:none;border:0;padding:9px 4px 11px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;min-height:52px;color:${
+              active === tab ? 'var(--accent)' : 'var(--ink-3)'
+            }`}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <path d={TAB_ICONS[tab]} />
+            </svg>
+            <span style={`font-size:10px;font-weight:${active === tab ? 700 : 600}`}>{labels[tab]}</span>
+          </button>
+        ))}
+      </div>
+    </nav>
+  )
+}
+
+export function Stat({ value, label }: { value: string; label: string }) {
+  return (
+    <div style="flex:1;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:11px 8px;text-align:center">
+      <div class="mono" style="font-size:20px;font-weight:700;letter-spacing:-.02em">{value}</div>
+      <div style="font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);margin-top:3px">
+        {label}
+      </div>
+    </div>
+  )
+}
