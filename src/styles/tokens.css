@@ -1,0 +1,71 @@
+/* Sistema de tokens de Nado. Un solo acento; los neutros tiran a frío. */
+:root {
+  --bg: #F1F3F4;
+  --card: #FFFFFF;
+  --card-2: #E9ECEE;
+  --ink: #101518;
+  --ink-2: #56616A;
+  --ink-3: #8B959D;
+  --line: #DDE2E6;
+  --line-2: #EDEFF2;
+  --accent: #0D6E78;
+  --accent-deep: #08434A;
+  --accent-soft: #D9EAEC;
+  --good: #1F6B4A;
+  --warn: #8A5A12;
+  --warn-soft: #F4E7D4;
+  --danger: #A3342A;
+  --tabbar: rgba(255, 255, 255, 0.92);
+
+  --sys: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --dsp: 'Archivo', var(--sys);
+  --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --r-card: 16px;
+  --r-btn: 13px;
+  --r-chip: 999px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #0B0E11;
+    --card: #161B20;
+    --card-2: #1F262D;
+    --ink: #E8ECF0;
+    --ink-2: #A0AAB5;
+    --ink-3: #6E7883;
+    --line: #252D35;
+    --line-2: #1C232A;
+    --accent: #4FB4BE;
+    --accent-deep: #7ED6DC;
+    --accent-soft: #10333A;
+    --good: #5BB98B;
+    --warn: #D5A45C;
+    --warn-soft: #33290F;
+    --danger: #E88379;
+    --tabbar: rgba(22, 27, 32, 0.92);
+  }
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body, #app { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sys);
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+.dsp { font-family: var(--dsp); font-weight: 800; letter-spacing: -0.032em; margin: 0; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
