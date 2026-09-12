@@ -32,17 +32,37 @@ export function paddlesLocked(config: Config): boolean {
 /**
  * Sustituye un bloque cuyo material no está disponible. Devuelve el id del
  * ejercicio a usar, o null si hay que quitar el bloque entero.
+ *
+ * Si el bloque declara `styleRotation`, la semana decide qué candidato "le
+ * toca" sobre la lista COMPLETA (no la filtrada), y desde ahí se busca hacia
+ * delante el primero que pase nivel y material. Así "semana N → estilo X"
+ * es estable: si un candidato deja de estar disponible a mitad de ciclo
+ * (por ejemplo, se quitan las aletas), solo cambia lo que toca ESA semana,
+ * no se reordena la rotación de las semanas siguientes.
  */
 export function resolveExercise(
   spec: BlockSpec,
   available: Equipment[],
   level: LevelId,
+  week: number,
 ): string | null {
   const ok = (id: string): boolean => {
     const ex = getExercise(id)
     if (ex.equipment !== null && !available.includes(ex.equipment)) return false
     return levelAtLeast(level, ex.minLevel)
   }
+
+  if (spec.styleRotation && spec.styleRotation.length > 0) {
+    const list = spec.styleRotation
+    const start = (week - 1) % list.length // week siempre ≥ 1 (viene de cyclePosition)
+    for (let i = 0; i < list.length; i += 1) {
+      const candidate = list[(start + i) % list.length]!
+      if (ok(candidate)) return candidate
+    }
+    // Ningún candidato de la rotación vale hoy (nivel o material): cae al
+    // resto de la resolución normal, como cualquier otro bloque.
+  }
+
   if (ok(spec.exerciseId)) return spec.exerciseId
   for (const alt of spec.fallbacks ?? []) {
     if (ok(alt)) return alt
@@ -103,6 +123,49 @@ function scaleMetres(metres: number, factor: number, pool: PoolLength): number {
   return steps * pool
 }
 
+/**
+ * Última red de seguridad, después de `fitToPool`: garantiza que el bloque,
+ * ya encajado en la piscina, vuelve al lado donde se empezó — sin ella,
+ * un bloque de 6×25 en piscina de 50 se reescribe a 3×50 (impar) y deja al
+ * nadador en la pared contraria a donde tiene el material. El ajuste nunca
+ * resta volumen: como mucho añade una repetición o un largo de piscina de
+ * propina. (Intentar forzar la paridad ya en el escalado, antes de esta
+ * función, se probó y solo empeoraba las cosas: reducía a la mitad la
+ * resolución del escalado semanal sin evitar que `fitToPool` la deshiciera
+ * de todos modos.)
+ */
+export function fitToWall(
+  reps: number,
+  metres: number,
+  pool: PoolLength,
+  /**
+   * Si el bloque se diseñó como una serie de repeticiones (`spec.reps > 1`),
+   * aunque `fitToPool` lo haya dejado en una sola tirada al reescribirlo
+   * para una piscina distinta a la de diseño. Decide si el ajuste añade una
+   * repetición (mantiene el ejercicio como una serie) o alarga la tirada
+   * (lo trata como un nado continuo) — no es lo mismo para el nadador: un
+   * ejercicio de "repite y para" no debe acabar convertido en un continuo.
+   */
+  isSeries: boolean,
+): { reps: number; metres: number } {
+  if (metres === 0) return { reps, metres } // bloques por tiempo: no cambian de lado
+  const lengthsPerRep = metres / pool // fitToPool garantiza que es un entero
+  const totalLengths = reps * lengthsPerRep
+  if (totalLengths % 2 === 0) return { reps, metres } // el bloque ya vuelve al lado de salida
+
+  if (isSeries) {
+    // Se añade una repetición en vez de alargar la tirada, aunque
+    // `fitToPool` haya dejado el bloque en una sola repetición.
+    return { reps: reps + 1, metres }
+  }
+
+  // Bloque de una sola tirada por diseño (calentamiento, vuelta a la calma,
+  // continuo largo...): se sube la distancia al múltiplo de 2×piscina más
+  // próximo por arriba (metres ya es un múltiplo impar de pool, así que
+  // +pool basta).
+  return { reps, metres: metres + pool }
+}
+
 export interface BuildOptions {
   config: Config
   /** 1 = primera semana del ciclo. */
@@ -110,18 +173,19 @@ export interface BuildOptions {
   cycleWeeks?: number
 }
 
-function buildBlocks(
+export function buildBlocks(
   template: SessionTemplate,
   config: Config,
   factor: number,
   idPrefix: string,
+  week: number,
 ): PlanBlock[] {
   const available = usableEquipment(config)
   const blocks: PlanBlock[] = []
   let n = 0
 
   for (const spec of template.blocks) {
-    const exerciseId = resolveExercise(spec, available, config.level)
+    const exerciseId = resolveExercise(spec, available, config.level, week)
     if (exerciseId === null) continue
 
     const ex = getExercise(exerciseId)
@@ -140,6 +204,17 @@ function buildBlocks(
       reps = fitted.reps
       metres = fitted.metres
       rest = fitted.restSeconds
+
+      // Los estilos más exigentes de hombro (mariposa) o de fatiga (ondulación
+      // con aletas) no deben ganar volumen solo para volver a la pared: para
+      // esos, el ajuste se salta y el bloque puede, en algún caso raro,
+      // quedar en el lado contrario — un mal menor frente a añadir más
+      // mariposa de la prescrita.
+      if (!spec.exactMetres && !ex.neverAmplify) {
+        const walled = fitToWall(reps, metres, config.pool, spec.reps > 1)
+        reps = walled.reps
+        metres = walled.metres
+      }
     }
 
     n += 1
@@ -208,8 +283,12 @@ export function buildSessions(opts: BuildOptions): PlanSession[] {
       templateId: template.id,
       name: config.lang === 'en' ? template.nameEn : template.nameEs,
       intensity: template.intensity,
-      minutes: template.kind === 'seco' ? 20 : config.minutesPerSession,
-      blocks: buildBlocks(template, config, factor, id),
+      // 5 ejercicios × 2-3 series con descanso real son más cerca de 25 min
+      // que de 20 — declararlo corto es lo que hace que la gente se salte
+      // el último ejercicio (la rotación externa de hombro, justo el único
+      // preventivo de la lista).
+      minutes: template.kind === 'seco' ? 25 : config.minutesPerSession,
+      blocks: buildBlocks(template, config, factor, id, week),
     }
   })
 }

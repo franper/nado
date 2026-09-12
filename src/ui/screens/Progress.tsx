@@ -1,8 +1,46 @@
-import { formatTime, pacePer100 } from '../../domain/metrics'
-import type { AppData, Lang, SessionLog } from '../../domain/types'
+import { formatTime, pacePer100, paceChangePercent } from '../../domain/metrics'
+import type { AppData, Lang, SessionLog, TestResult } from '../../domain/types'
 import { t } from '../../i18n'
 import { Card, Chip, Label, Stat } from '../components'
 import { DAY_LABELS, addDays, isoOf, mondayOf } from '../shared'
+
+/**
+ * Por debajo de este margen no se afirma nada: cronometrar a mano tiene de
+ * por sí una variación de este orden entre intentos, así que una diferencia
+ * menor no dice mucho todavía. El texto usa esta misma constante para que
+ * el umbral y lo que se explica no puedan desincronizarse.
+ */
+const NOISE_MARGIN = 4
+
+function testPace(test: TestResult): number {
+  return pacePer100(test.seconds, test.metres ?? 400)
+}
+
+function paceCompareText(lang: Lang, previous: TestResult, current: TestResult): string {
+  const es = lang === 'es'
+  const prevPace = testPace(previous)
+  const curPace = testPace(current)
+  const prev = formatTime(prevPace)
+  const cur = formatTime(curPace)
+  // Se compara el ritmo por 100 m, no los segundos totales: si los dos
+  // tests no fueron a la misma distancia (uno no llegó a los 400),
+  // comparar segundos directamente sería comparar peras con manzanas.
+  const change = paceChangePercent(prevPace, curPace)
+
+  if (Math.abs(change) < NOISE_MARGIN) {
+    return es
+      ? `Ritmo parecido al del ciclo del ${previous.date} (${prev} → ${cur}). Cronometrar a mano tiene un margen del orden de un ${NOISE_MARGIN} %, así que una diferencia tan pequeña no dice mucho por sí sola.`
+      : `Similar pace to the ${previous.date} cycle (${prev} → ${cur}). Hand-timing has a margin of around ${NOISE_MARGIN}%, so a difference this small doesn't say much yet.`
+  }
+  if (change > 0) {
+    return es
+      ? `${prev} → ${cur}: un ${Math.round(change)} % más rápido que el test del ${previous.date}.`
+      : `${prev} → ${cur}: ${Math.round(change)}% faster than the ${previous.date} test.`
+  }
+  return es
+    ? `${prev} → ${cur}: un ${Math.round(Math.abs(change))} % más lento que el test del ${previous.date}. Es normal, sobre todo si has faltado a alguna sesión.`
+    : `${prev} → ${cur}: ${Math.round(Math.abs(change))}% slower than the ${previous.date} test. Normal, especially if you missed a session or two.`
+}
 
 function logsList(data: AppData): SessionLog[] {
   return Object.values(data.logs)
@@ -94,10 +132,15 @@ export function Progress({ data, lang }: { data: AppData; lang: Lang }) {
                 <div style="font-size:11.5px;color:var(--ink-2)">{test.date}</div>
               </div>
               <div style="text-align:right">
-                <div class="mono" style="font-size:21px;font-weight:700">{formatTime(pacePer100(test.seconds))}</div>
+                <div class="mono" style="font-size:21px;font-weight:700">{formatTime(testPace(test))}</div>
                 <div class="mono" style="font-size:10.5px;color:var(--ink-3)">/100 m</div>
               </div>
             </div>
+            {data.previousTest ? (
+              <p style="margin:10px 0 0;padding-top:10px;border-top:1px solid var(--line-2);font-size:12px;color:var(--ink-2);line-height:1.5">
+                {paceCompareText(lang, data.previousTest, test)}
+              </p>
+            ) : null}
           </Card>
         </div>
       ) : (

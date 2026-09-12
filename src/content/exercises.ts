@@ -37,6 +37,13 @@ export interface Exercise {
   minLevel: LevelId
   /** Se mide en tiempo en lugar de en metros. */
   timeBased?: boolean
+  /**
+   * Nunca se le añade volumen para que el bloque vuelva a la pared de
+   * salida (ver `fitToWall` en generator.ts). Para estilos exigentes de
+   * hombro o de fatiga, es preferible que el bloque ocasionalmente acabe
+   * en el lado contrario a que gane una repetición o un largo de propina.
+   */
+  neverAmplify?: boolean
   es: ExerciseText
   en: ExerciseText
 }
@@ -154,7 +161,7 @@ export const EXERCISES: Exercise[] = [
       detail: [
         'Montaje. Sin material, crol normal.',
         'Ejecución. Respiras cada tres brazadas, alternando lado. La clave está debajo del agua: suelta todo el aire por nariz y boca de forma continua mientras la cara está sumergida, para que al girar solo tengas que coger.',
-        'Error típico. Aguantar el aire y luego soltar y coger en el mismo medio segundo. Es la causa número uno de ahogarse nadando.',
+        'Error típico. Aguantar el aire y luego soltar y coger en el mismo medio segundo. Es la causa número uno de la sensación de ahogo nadando.',
         'Qué debes notar. Calma. Si cada tres brazadas te agobia, baja el ritmo antes que volver a respirar cada dos.',
       ],
     },
@@ -282,6 +289,7 @@ export const EXERCISES: Exercise[] = [
     equipment: 'aletas',
     tags: ['cadera', 'piernas'],
     minLevel: 'basico',
+    neverAmplify: true,
     es: {
       name: 'Ondulación',
       query: 'ondulacion delfin natacion ejercicio tecnica',
@@ -341,7 +349,7 @@ export const EXERCISES: Exercise[] = [
       detail: [
         'Montaje. En la parte honda y pegado al bordillo o a la corchera, con aletas. Cuerpo vertical, brazos cruzados sobre el pecho.',
         'Ejecución. Ondulación continua, solo con las piernas, para mantenerte a flote con los hombros fuera del agua.',
-        'Seguridad. Hazlo siempre donde puedas agarrarte de inmediato. Si notas que te hundes, agárrate: no es un ejercicio de aguantar.',
+        'Seguridad. Hazlo siempre donde puedas agarrarte de inmediato, y nunca si eres el único en la piscina. Si notas que te hundes, agárrate: no es un ejercicio de aguantar.',
         'Qué debes notar. Glúteo, cuádriceps y core a tope. Es de lo más exigente que se puede hacer en una piscina.',
       ],
     },
@@ -351,7 +359,7 @@ export const EXERCISES: Exercise[] = [
       detail: [
         'Set-up. In the deep end, next to the wall or lane rope, with fins. Body vertical, arms crossed over the chest.',
         'Execution. Continuous undulation, legs only, keeping your shoulders out of the water.',
-        'Safety. Always do it where you can grab something instantly. If you start sinking, grab it — this is not an endurance test.',
+        'Safety. Always do it where you can grab something instantly, and never when you are the only one in the pool. If you start sinking, grab it — this is not an endurance test.',
         'What you should feel. Glutes, quads and core at full effort. It is one of the hardest things you can do in a pool.',
       ],
     },
@@ -517,6 +525,137 @@ export const EXERCISES: Exercise[] = [
         'Execution. 400 metres as fast as you can hold from start to finish, without stopping. It is not a sprint: if the last 100 falls apart, you went out too hard.',
         'What it gives you. Your reference pace per 100 metres. The app uses it to set the speed of every set in the cycle.',
         'When you finish, enter the total time. If you can’t reach 400, enter what you did and the distance — that works too.',
+      ],
+    },
+  }),
+
+  // ------------------------------------------------------------ estilos
+  E({
+    id: 'espalda-tecnica',
+    equipment: null,
+    tags: ['tecnica'],
+    minLevel: 'inicio',
+    es: {
+      name: 'Espalda: patada y posición',
+      query: 'espalda natacion patada posicion tecnica',
+      detail: [
+        'Montaje. Boca arriba, orejas metidas en el agua, cadera alta cerca de la superficie, brazos pegados al cuerpo o estirados por encima de la cabeza.',
+        'Ejecución. Patada continua desde la cadera, hombros y cadera girando juntos como un bloque a cada patada. Este ejercicio es de posición y patada — la brazada completa se trabaja en espalda continua.',
+        'Error típico. Mirar hacia los pies en vez de al techo. La cabeza fija mirando arriba es lo que mantiene la cadera alta.',
+        'Aviso. En espalda no ves hacia dónde vas. En calle compartida, cuenta los largos y mira hacia atrás antes de acercarte a la pared — el golpe de cabeza contra la pared o contra otro nadador es el accidente más típico de este estilo.',
+        'Qué debes notar. Que respiras sin esfuerzo, porque la cara nunca se moja. Es el estilo más cómodo para aprender a respirar sin agobios.',
+      ],
+    },
+    en: {
+      name: 'Backstroke: kick and position',
+      query: 'backstroke swimming kick position technique',
+      detail: [
+        'Set-up. On your back, ears in the water, hips high near the surface, arms along the body or extended overhead.',
+        'Execution. Continuous kick from the hip, shoulders and hips rolling together as one unit with each kick. This drill is about position and kick — the full stroke is trained in continuous backstroke.',
+        'Common mistake. Looking at your feet instead of the ceiling. Keeping the head fixed looking up is what keeps the hips high.',
+        'Warning. In backstroke you cannot see where you are going. In a shared lane, count your lengths and look back before nearing the wall — hitting your head on the wall or on another swimmer is the most common accident with this stroke.',
+        'What you should feel. That you breathe without effort, since your face never gets wet. It is the easiest stroke to learn to breathe without stress in.',
+      ],
+    },
+  }),
+  E({
+    id: 'espalda-continuo',
+    equipment: null,
+    tags: ['continuo'],
+    minLevel: 'basico',
+    es: {
+      name: 'Espalda continua',
+      query: 'nadar espalda continuo tecnica resistencia',
+      detail: [
+        'Ejecución. Espalda completa, sin parar, a un ritmo que puedas sostener toda la serie. Cuenta las brazadas por largo: si varían mucho de uno a otro, estás cambiando el gesto por cansancio.',
+        'Para qué sirve. Es el complemento perfecto al crol: trabaja el hombro en el sentido contrario y descansa la zona cervical, que el crol carga al respirar de lado.',
+      ],
+    },
+    en: {
+      name: 'Continuous backstroke',
+      query: 'continuous backstroke swimming endurance drill',
+      detail: [
+        'Execution. Full backstroke, without stopping, at a pace you can hold for the whole set. Count strokes per length: if they vary a lot, your technique is drifting from fatigue.',
+        'Why. It is the perfect complement to freestyle: it works the shoulder the opposite way and rests the neck, which freestyle loads while breathing to the side.',
+      ],
+    },
+  }),
+  E({
+    id: 'braza-tecnica',
+    equipment: null,
+    tags: ['tecnica'],
+    minLevel: 'inicio',
+    es: {
+      name: 'Braza: tiempo y deslizamiento',
+      query: 'braza natacion tecnica tiempo deslizamiento',
+      detail: [
+        'Montaje. Boca abajo, brazos estirados delante, piernas juntas.',
+        'Ejecución. El orden es tirar, respirar, meter la patada, deslizar. Después de cada patada, un instante estirado en línea antes de la siguiente brazada — es la parte que todo el mundo se salta.',
+        'Error típico. Encadenar brazada y patada sin la pausa de deslizamiento. Sin ese instante de estirarse, la braza gasta el doble de energía para avanzar lo mismo.',
+        'Aviso. La rodilla es la lesión más común de este estilo. Las rodillas no se abren más que la cadera al recoger los talones; si notas un pinchazo en la cara interna de la rodilla, para y cambia a otro estilo ese día.',
+        'Qué debes notar. Que avanzas más en el deslizamiento que en la propia brazada. Si no lo notas, estás apurando el ejercicio.',
+      ],
+    },
+    en: {
+      name: 'Breaststroke: timing and glide',
+      query: 'breaststroke swimming timing glide technique',
+      detail: [
+        'Set-up. Face down, arms extended in front, legs together.',
+        'Execution. The order is pull, breathe, kick, glide. After every kick, hold a streamlined moment before the next pull — it is the part everyone skips.',
+        'Common mistake. Chaining the pull and the kick without the glide pause. Without that streamlined moment, breaststroke burns twice the energy to cover the same distance.',
+        'Warning. The knee is this stroke’s most common injury. The knees never open wider than the hips as the heels come up; if you feel a twinge on the inside of the knee, stop and switch to another stroke that day.',
+        'What you should feel. That you travel further during the glide than during the pull itself. If you don’t, you are rushing the drill.',
+      ],
+    },
+  }),
+  E({
+    id: 'braza-continuo',
+    equipment: null,
+    tags: ['continuo'],
+    minLevel: 'basico',
+    es: {
+      name: 'Braza continua',
+      query: 'nadar braza continuo tecnica resistencia',
+      detail: [
+        'Ejecución. Braza completa, sin parar, manteniendo el orden tirar-respirar-patada-deslizar aunque te canses. Es el primer gesto que se pierde con la fatiga.',
+        'Referencia de ritmo. Es el estilo más lento de los cuatro: no lo compares con tu ritmo de crol, compáralo contigo mismo de una semana a otra.',
+      ],
+    },
+    en: {
+      name: 'Continuous breaststroke',
+      query: 'continuous breaststroke swimming endurance drill',
+      detail: [
+        'Execution. Full breaststroke, without stopping, keeping the pull-breathe-kick-glide order even as you tire. It is the first thing fatigue takes away.',
+        'Pace check. It is the slowest of the four strokes: don’t compare it to your freestyle pace, compare it to yourself week over week.',
+      ],
+    },
+  }),
+  E({
+    id: 'mariposa-tecnica',
+    equipment: null,
+    tags: ['tecnica'],
+    minLevel: 'avanzado',
+    neverAmplify: true,
+    es: {
+      name: 'Mariposa: nado corto',
+      query: 'mariposa natacion tecnica series cortas',
+      detail: [
+        'Montaje. Series cortas, con descanso completo entre repeticiones. La mariposa se rompe por fatiga antes que por técnica.',
+        'Ejecución. Dos ondulaciones por ciclo de brazos: una cuando entran las manos, otra cuando salen. Los brazos recuperan estirados y bajos, casi rozando el agua, y las manos salen a la altura de la cadera con el meñique hacia arriba — no hay codo alto en la recuperación de mariposa, eso es crol.',
+        'Respiración. Barbilla hacia delante y baja, apenas lo justo para coger aire, sin sacar la cabeza hacia arriba. Sacarla hunde la cadera y rompe la ondulación en el acto.',
+        'Aviso. Es el estilo más exigente de hombro que existe, y la zona lumbar también carga si la ondulación nace de la espalda en vez de la cadera. Para en cuanto la brazada se descomponga — seguir con la técnica rota y cansado es la forma más directa de lesionarse.',
+        'Qué debes notar. Que el cuerpo ondula solo, como una ola, y los brazos casi se limitan a acompañar. Si vas a fuerza de brazo, vas a durar poco.',
+      ],
+    },
+    en: {
+      name: 'Butterfly: short swim',
+      query: 'butterfly swimming technique short repeats',
+      detail: [
+        'Set-up. Short repeats, with full rest between them. Butterfly breaks down from fatigue long before it breaks down from technique.',
+        'Execution. Two body undulations per arm cycle: one as the hands enter, one as they exit. The arms recover straight and low, almost skimming the water, hands exiting at hip height with the pinky up — there is no high elbow in the butterfly recovery, that is freestyle.',
+        'Breathing. Chin forward and low, just enough to get air, without lifting the head up. Lifting it sinks the hips and breaks the undulation instantly.',
+        'Warning. It is the most shoulder-demanding stroke there is, and the lower back loads too if the undulation starts from the back instead of the hips. Stop the moment your stroke falls apart — pushing through tired, broken technique is the most direct route to injury.',
+        'What you should feel. That the body undulates on its own, like a wave, and the arms mostly just come along. If you are muscling it with your arms, you will not last long.',
       ],
     },
   }),

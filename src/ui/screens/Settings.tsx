@@ -34,6 +34,7 @@ export function Settings({
   const config = data.config
   const [msg, setMsg] = useState<string | null>(null)
   const [testInput, setTestInput] = useState('')
+  const [testMetres, setTestMetres] = useState('400')
   const [confirmErase, setConfirmErase] = useState(false)
   if (!config) return null
 
@@ -45,13 +46,19 @@ export function Settings({
       parts.length === 2
         ? Number(parts[0]) * 60 + Number(parts[1])
         : Number(testInput)
-    if (!Number.isFinite(seconds) || seconds < 120 || seconds > 1800) {
+    if (!Number.isFinite(seconds) || seconds < 20 || seconds > 1800) {
       setMsg(es ? 'Pon el tiempo como m:ss, por ejemplo 8:56.' : 'Enter the time as m:ss, e.g. 8:56.')
       return
     }
-    setTest({ date: isoOf(new Date()), seconds })
+    const metres = testMetres.trim() === '' ? 400 : Number(testMetres)
+    if (!Number.isFinite(metres) || metres < 25 || metres > 400) {
+      setMsg(es ? 'Pon los metros nadados, entre 25 y 400.' : 'Enter the metres you swam, between 25 and 400.')
+      return
+    }
+    setTest({ date: isoOf(new Date()), seconds, ...(metres !== 400 ? { metres } : {}) })
     setMsg(es ? 'Ritmo guardado.' : 'Pace saved.')
     setTestInput('')
+    setTestMetres('400')
   }
 
   const pickFile = (): void => {
@@ -125,8 +132,8 @@ export function Settings({
           <Label>{es ? 'Resultado del test de 400 m' : '400 m test result'}</Label>
           <p style="margin:0 0 9px;font-size:12px;color:var(--ink-2);line-height:1.5">
             {es
-              ? 'Apunta el tiempo total en minutos y segundos. De ahí sale tu ritmo de referencia.'
-              : 'Enter the total time in minutes and seconds. Your reference pace comes from it.'}
+              ? 'Apunta el tiempo total en minutos y segundos. Si no llegaste a los 400, pon también cuántos metros hiciste — si no, se asume que fueron los 400 completos.'
+              : 'Enter the total time in minutes and seconds. If you did not reach 400, also enter how many metres you swam — otherwise the full 400 is assumed.'}
           </p>
           <div style="display:flex;gap:8px">
             <input
@@ -134,9 +141,20 @@ export function Settings({
               type="text"
               inputMode="numeric"
               placeholder="8:56"
+              aria-label={es ? 'Tiempo, minutos y segundos' : 'Time, minutes and seconds'}
               value={testInput}
               onInput={(e) => setTestInput((e.target as HTMLInputElement).value)}
               style="flex:1;background:var(--card-2);border:1px solid var(--line);border-radius:10px;padding:11px 12px;font-size:16px;font-weight:600"
+            />
+            <input
+              class="mono"
+              type="text"
+              inputMode="numeric"
+              placeholder="400"
+              aria-label={es ? 'Metros nadados' : 'Metres swum'}
+              value={testMetres}
+              onInput={(e) => setTestMetres((e.target as HTMLInputElement).value)}
+              style="width:64px;flex:none;background:var(--card-2);border:1px solid var(--line);border-radius:10px;padding:11px 8px;font-size:16px;font-weight:600;text-align:center"
             />
             <button
               type="button"

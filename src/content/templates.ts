@@ -21,6 +21,18 @@ export interface BlockSpec {
   intensity: BlockIntensity
   /** Si no escala, mantiene su tamaño aunque la sesión se acorte. */
   fixed?: boolean
+  /**
+   * La distancia es la medida en sí (ej. el test de 400 m): nunca se ajusta
+   * para volver al lado de salida de la piscina, aunque salga impar.
+   */
+  exactMetres?: boolean
+  /**
+   * Alternativas entre las que el generador rota según la semana del ciclo,
+   * en vez de resolver siempre `exerciseId`. Se filtran primero por nivel y
+   * material disponibles (igual que `fallbacks`) y solo se rota entre las
+   * que sobrevivan, para que nunca quede un hueco en la sesión.
+   */
+  styleRotation?: string[]
 }
 
 export interface SessionTemplate {
@@ -92,8 +104,11 @@ export const TEMPLATES: SessionTemplate[] = [
     minLevel: 'basico',
     blocks: [
       b({ exerciseId: 'calentamiento', reps: 1, metres: 250, restSeconds: 0, intensity: 'suave', fixed: true }),
-      b({ exerciseId: 'pull-brazos', fallbacks: ['crol-medio'], reps: 8, metres: 50, restSeconds: 30, intensity: 'fuerte' }),
+      // Las palas van pronto, con el hombro todavía fresco — el propio
+      // ejercicio avisa de que cansan mucho antes de lo que parece, así que
+      // no deben llegar después del tirón más duro de la sesión.
       b({ exerciseId: 'palas-brazos', fallbacks: [], reps: 4, metres: 50, restSeconds: 35, intensity: 'fuerte' }),
+      b({ exerciseId: 'pull-brazos', fallbacks: ['crol-medio'], reps: 8, metres: 50, restSeconds: 30, intensity: 'fuerte' }),
       b({ exerciseId: 'crol-medio', reps: 4, metres: 100, restSeconds: 40, intensity: 'medio' }),
       b({ exerciseId: 'patada-costado', fallbacks: ['patada-tabla'], reps: 8, metres: 25, restSeconds: 20, intensity: 'fuerte' }),
       b({ exerciseId: 'calma', reps: 1, metres: 150, restSeconds: 0, intensity: 'suave', fixed: true }),
@@ -153,10 +168,43 @@ export const TEMPLATES: SessionTemplate[] = [
     intensity: 'firme',
     minLevel: 'inicio',
     blocks: [
-      b({ exerciseId: 'calentamiento', reps: 1, metres: 300, restSeconds: 0, intensity: 'suave', fixed: true }),
-      b({ exerciseId: 'progresivos', reps: 4, metres: 25, restSeconds: 25, intensity: 'medio', fixed: true }),
-      b({ exerciseId: 'test-400', reps: 1, metres: 400, restSeconds: 0, intensity: 'fuerte', fixed: true }),
+      // 400 + 150 = 550 m de calentamiento antes de un esfuerzo máximo: un
+      // calentamiento corto deja el primer test artificialmente lento, y
+      // eso desnivela todos los ritmos objetivo del ciclo — y ahora también
+      // la comparación con el ciclo siguiente.
+      b({ exerciseId: 'calentamiento', reps: 1, metres: 400, restSeconds: 0, intensity: 'suave', fixed: true }),
+      b({ exerciseId: 'progresivos', reps: 6, metres: 25, restSeconds: 25, intensity: 'medio', fixed: true }),
+      b({ exerciseId: 'test-400', reps: 1, metres: 400, restSeconds: 0, intensity: 'fuerte', fixed: true, exactMetres: true }),
       b({ exerciseId: 'calma', reps: 1, metres: 200, restSeconds: 0, intensity: 'suave', fixed: true }),
+    ],
+  },
+  {
+    id: 't-estilos',
+    nameEs: 'Técnica de estilos',
+    nameEn: 'Stroke technique',
+    kind: 'piscina',
+    intensity: 'suave',
+    minLevel: 'inicio',
+    blocks: [
+      b({ exerciseId: 'calentamiento', reps: 1, metres: 250, restSeconds: 0, intensity: 'suave', fixed: true }),
+      b({
+        exerciseId: 'espalda-tecnica',
+        fallbacks: ['crol-medio'],
+        styleRotation: [
+          'espalda-tecnica',
+          'braza-tecnica',
+          'espalda-continuo',
+          'braza-continuo',
+          'ondulacion',
+          'mariposa-tecnica',
+        ],
+        reps: 6,
+        metres: 25,
+        restSeconds: 25,
+        intensity: 'medio',
+      }),
+      b({ exerciseId: 'pull-brazos', fallbacks: ['crol-medio'], reps: 6, metres: 50, restSeconds: 30, intensity: 'medio' }),
+      b({ exerciseId: 'calma', reps: 1, metres: 150, restSeconds: 0, intensity: 'suave', fixed: true }),
     ],
   },
   {
@@ -181,11 +229,19 @@ export const TEMPLATE_BY_ID: ReadonlyMap<string, SessionTemplate> = new Map(
  * lista tantas veces como días haya, saltando las que el nivel no permita.
  */
 export const RECIPES: Record<Goal, string[]> = {
-  grasa: ['t-intervalos', 't-base', 't-fuerza-agua', 't-continuo', 't-intervalos'],
-  fondo: ['t-base', 't-continuo', 't-tecnica', 't-intervalos', 't-continuo'],
-  tecnica: ['t-tecnica', 't-base', 't-tecnica', 't-continuo', 't-base'],
-  rendimiento: ['t-ritmos', 't-base', 't-intervalos', 't-continuo', 't-ritmos'],
-  tono: ['t-fuerza-agua', 't-seco', 't-cadera', 't-base', 't-seco'],
+  // t-estilos sustituye al SEGUNDO t-intervalos: el objetivo es gasto
+  // calórico, así que la única sesión de intensidad no se toca.
+  grasa: ['t-intervalos', 't-base', 't-fuerza-agua', 't-continuo', 't-estilos'],
+  fondo: ['t-base', 't-continuo', 't-estilos', 't-intervalos', 't-continuo'],
+  tecnica: ['t-tecnica', 't-base', 't-estilos', 't-continuo', 't-base'],
+  // t-estilos sustituye al SEGUNDO t-ritmos: sin esto, un usuario básico se
+  // quedaba sin ninguna sesión de intensidad (t-ritmos exige nivel medio).
+  rendimiento: ['t-ritmos', 't-base', 't-intervalos', 't-continuo', 't-estilos'],
+  // t-estilos se AÑADE al final en vez de sustituir nada: tono solo tiene
+  // dos bloques en seco y perder uno (o los dos en la semana 1, si el que
+  // sustituye acaba en el índice 0) contradice lo que la propia app le
+  // promete al usuario sobre este objetivo.
+  tono: ['t-fuerza-agua', 't-seco', 't-cadera', 't-base', 't-seco', 't-estilos'],
 }
 
 /** Plantilla de repuesto cuando el nivel no alcanza para ninguna de la receta. */

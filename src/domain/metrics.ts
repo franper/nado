@@ -71,6 +71,18 @@ export function zonePace(testSeconds: number, zone: PaceZone): number {
   return pacePer100(testSeconds) * PACE_ZONES[zone]
 }
 
+/**
+ * % de cambio entre dos valores de ritmo (segundos por 100 m). Positivo =
+ * más rápido. Es una simple diferencia porcentual: si los dos tests fueron
+ * a la misma distancia, comparar segundos totales o ritmo por 100 da lo
+ * mismo, pero si uno no llegó a los 400 hace falta pasar por `pacePer100`
+ * primero para que la comparación tenga sentido.
+ */
+export function paceChangePercent(previousPace: number, currentPace: number): number {
+  if (previousPace <= 0) return 0
+  return ((previousPace - currentPace) / previousPace) * 100
+}
+
 /** Segundos → "m:ss". */
 export function formatTime(seconds: number): string {
   if (!isFinite(seconds) || seconds <= 0) return '—'

@@ -74,7 +74,17 @@ export const setConfig = (config: Config): void => {
 }
 
 export const setTest = (test: TestResult): void => {
-  update((d) => ({ ...d, previousTest: d.test, test }))
+  update((d) => {
+    // Si se repite el test el mismo día (por ejemplo, corrigiendo un tecleo),
+    // no se debe desplazar el test anterior: si no, el ciclo previo se
+    // pierde para siempre solo por haber guardado dos veces en un rato.
+    const sameDay = d.test?.date === test.date
+    return {
+      ...d,
+      previousTest: sameDay ? d.previousTest : d.test,
+      test,
+    }
+  })
 }
 
 export const setPlan = (plan: AppData['plan']): void => {

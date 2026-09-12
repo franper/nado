@@ -67,8 +67,10 @@ export interface Config {
 /** Resultado del test de 400 m, del que salen los ritmos. */
 export interface TestResult {
   date: string
-  /** Tiempo total de los 400 m, en segundos. */
+  /** Tiempo total, en segundos. */
   seconds: number
+  /** Metros nadados, si no llegó a los 400. undefined = 400 (el test completo). */
+  metres?: number
 }
 
 // ---------------------------------------------------------------- plan

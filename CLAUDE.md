@@ -10,7 +10,7 @@ En vivo: https://franper.github.io/nado/ · Repo: franper/nado
 
 ```bash
 npm run dev      # servidor de desarrollo
-npm test         # vitest, 18 tests. Debe estar verde antes de cualquier push
+npm test         # vitest, 51 tests. Debe estar verde antes de cualquier push
 npm run build    # tsc -b --noEmit && vite build
 ```
 
@@ -28,10 +28,10 @@ Sin librería de estilos: tokens CSS en `src/styles/tokens.css` y estilos en lí
 ## Arquitectura
 
 ```
-src/content/exercises.ts   20 ejercicios bilingües. El activo real del producto
-src/content/templates.ts   9 plantillas de sesión + RECIPES (plantillas por objetivo)
-src/domain/generator.ts    escala, sustituye material y reescribe a la piscina
-src/domain/metrics.ts      kcal por MET, ritmos derivados del test de 400 m
+src/content/exercises.ts   25 ejercicios bilingües. El activo real del producto
+src/content/templates.ts   10 plantillas de sesión + RECIPES (plantillas por objetivo)
+src/domain/generator.ts    escala, sustituye material, reescribe a la piscina y a la pared
+src/domain/metrics.ts      kcal por MET, ritmos derivados del test, % de cambio entre tests
 src/domain/storage.ts      localStorage clave 'nado', con DATA_VERSION y migrate()
 src/domain/types.ts        modelo de datos
 src/ui/                    App (error boundary + pestañas), componentes y pantallas
@@ -43,6 +43,18 @@ escala el volumen por nivel/minutos/semana y reescribe las series para que encaj
 la piscina (12×25 → 6×50 en piscina de 50 m; no divide, rehace). Añadir bloques libres
 producía sesiones incoherentes; no volver a esa idea.
 
+Después de encajar en la piscina (`fitToPool`), `fitToWall` garantiza que cada bloque
+nadado vuelve al lado donde empezó — donde el usuario deja el material y lee el
+siguiente ejercicio. Añade como mucho una repetición o un largo de propina; nunca
+resta. Dos excepciones: `BlockSpec.exactMetres` (el test de 400, que mide una distancia
+exacta) y `Exercise.neverAmplify` (mariposa y ondulación: mejor que acaben alguna vez en
+el lado contrario a que ganen volumen del estilo que más lesiona).
+
+Algunos bloques rotan de ejercicio según la semana (`BlockSpec.styleRotation`, usado por
+`t-estilos` para alternar espalda/braza/mariposa). El índice se calcula sobre la lista
+completa y busca hacia delante el primer candidato que pase nivel y material — así
+"semana N → estilo X" es estable aunque cambie el material disponible a mitad de ciclo.
+
 **Separación de datos, por orden de intocabilidad:**
 `logs` (sagrado, nunca se regenera) > `overrides` (ediciones del usuario) >
 `plan` (regenerable) > `config`. `sessionsForWeek()` aplica los overrides sobre lo
@@ -51,8 +63,15 @@ un ejercicio no los rompe — pero sí rompería un override que lo contenga.
 
 **Reglas que no se negocian:**
 - Las palas quedan bloqueadas por debajo de nivel `medio` (`PADDLES_MIN_LEVEL`), por
-  riesgo de hombro. La app lo explica en el onboarding.
-- La patada vertical exige un punto de agarre inmediato y se dice en su texto.
+  riesgo de hombro. La app lo explica en el onboarding, y en `t-fuerza-agua` van
+  **antes** del bloque de tirón más duro de la sesión, con el hombro todavía fresco.
+- La patada vertical exige un punto de agarre inmediato y nunca hacerla en solitario;
+  se dice en su texto.
+- Espalda avisa de que no ves hacia dónde vas (colisiones con la pared o con otro
+  nadador). Braza avisa de la rodilla, su lesión más común. Mariposa avisa de hombro
+  y lumbar, y sus bloques nunca ganan volumen extra por el ajuste de piscina
+  (`Exercise.neverAmplify`) — mejor que acabe alguna vez en el lado contrario a que
+  se prescriba más mariposa de la debida.
 - Los textos de los ejercicios dicen la verdad aunque reste protagonismo al agua:
   la patada con tabla aporta poco en crol de fondo, y la tonificación la da el bloque
   en seco porque el agua no ofrece carga progresiva.
@@ -74,21 +93,32 @@ Comprobado empíricamente:
 | Plantilla nueva con ejercicio inexistente, sin meter en `RECIPES` | ❌ **nada** hasta que la enchufes |
 | Objetivo nuevo en el tipo `Goal` | tsc obliga a escribir su receta |
 
-**Pendiente: test de integridad de contenido** (~30 líneas) que valide que todo id de
-`RECIPES` existe, que todo `exerciseId` y `fallback` de *todas* las plantillas existe
-(usadas o no), que no hay plantillas ni ejercicios huérfanos y que ningún texto está
-vacío. Cierra los dos agujeros de arriba.
+**Hecho: test de integridad de contenido** (`src/content/content.test.ts`). Valida que
+todo id de `RECIPES` existe, que todo `exerciseId`, `fallback` y candidato de
+`styleRotation` de *todas* las plantillas existe (usadas o no), que no hay plantillas ni
+ejercicios huérfanos y que ningún texto está vacío. Escríbelo (o revísalo) **antes** de
+tocar `RECIPES` — es el único sitio del contenido sin red de tipos.
 
-**Agujero de calidad medido:** nadie comprueba que la sesión quepa en el tiempo elegido.
-Con ritmos realistas por nivel, muchas sesiones ocupan el 56–69% del tiempo que el
-usuario eligió (quien pide 60 min recibe ~40). Va en la dirección segura, pero antes de
-poner un test de duración hay que ajustar `LEVEL_FACTOR` o el volumen de las plantillas.
+**Agujero de calidad medido, todavía sin arreglar:** nadie comprueba que la sesión quepa
+en el tiempo elegido. Con ritmos realistas por nivel, muchas sesiones ocupan el 56–69%
+del tiempo que el usuario eligió (quien pide 60 min recibe ~40). Y `fitToWall` (arriba)
+añade otro sesgo medido en la misma dirección: a igualdad de objetivo/nivel/minutos, una
+sesión en piscina de 50 m puede pesar hasta un 30% más que la misma en piscina de 25 m,
+porque cada largo de más cuesta el doble en distancia. Los dos apuntan al mismo sitio:
+antes de tocar `LEVEL_FACTOR` o el volumen de las plantillas para arreglar uno, hay que
+mirar los dos juntos, no por separado.
 
-**Huecos de contenido conocidos:** `t-seco` es un único bloque fijo de 15 min sin
-progresión, y es justo la sesión que sostiene el objetivo "tono"; todo es crol (nada de
-braza ni estilos); el ritmo objetivo exige nivel `medio`, así que el principiante no
-recibe referencia de velocidad; 9 plantillas hacen que el ciclo 3 se parezca al 1; y el
-plan no reacciona a cómo fue la sesión, solo al número de semana y al nivel.
+**Huecos de contenido conocidos:** `t-seco` es un único bloque fijo (declarado 25 min,
+sin progresión de una semana a otra) y es justo la sesión que sostiene el objetivo
+"tono"; el ritmo objetivo exige nivel `medio`, así que el principiante no recibe
+referencia de velocidad; el ciclo 2 es idéntico al 1 (mismas plantillas, mismo arranque
+de volumen) — `t-estilos` rota de estilo semana a semana dentro de un ciclo, pero esa
+rotación también se repite igual en el ciclo siguiente; y el plan no reacciona a cómo
+fue la sesión, solo al número de semana y al nivel. El nivel del usuario (`config.level`)
+se deriva solo de metros continuos en crol y con eso se decide si desbloquea mariposa o
+palas — es un proxy conservador para las palas, pero no acredita nada sobre si alguien
+sabe nadar mariposa. Antes de automatizar cualquier subida de nivel, hace falta una
+pregunta aparte sobre qué estilos conoce el usuario.
 
 ## Actualización en el móvil (problema activo)
 
@@ -116,13 +146,27 @@ Ajustes y comprobar actualizaciones también al volver al primer plano
   de los datos, que cada usuario exporte una copia.
 - Hay datos reales en uso (dos personas con sesiones registradas). Nada de cambios que
   puedan perderlos sin migración probada.
+- `migrate()` (`storage.ts`) **no** rama por `DATA_VERSION`: hace un merge campo a campo
+  contra `emptyData()`, así que un campo opcional nuevo (ej. `TestResult.metres`) no
+  necesita subir la versión ni tocar `migrate()` — un documento viejo sin ese campo ya
+  funciona, siempre que el código que lo lea use un valor por defecto (`?? 400`, aquí).
+  Si el cambio no es opcional (cambia la forma de algo existente), eso sí exige escribir
+  la cadena de migración por primera vez — hoy no existe, solo el comentario que dice
+  dónde iría.
 
 ## Pendiente de implementar
 
 1. **"Hoy no puedo"**: recortar la sesión a 25–30 min en un toque. Estaba en el diseño
    aprobado y sigue sin hacerse. Es lo que salva el día en que llegas tarde.
-2. **Re-test al cerrar el ciclo**: la semana 8 baja el volumen a 0,8 pero no pide repetir
-   el test de 400 m, así que el ritmo objetivo se queda congelado para siempre.
+2. **Re-test al cerrar el ciclo**: la semana 8 baja el volumen a 0,8 y el ciclo nuevo
+   vuelve a proponer el test en su semana 1 (`t-test`), y si el usuario lo repite ahora
+   ve en Progreso cómo cambió su ritmo frente al ciclo anterior (`paceCompareText` en
+   `Progress.tsx`, con el margen de error dicho explícitamente). Lo que sigue faltando:
+   nada avisa proactivamente de que toca repetir el test si el usuario no entra solo, y
+   nada ajusta el nivel ni el volumen automáticamente a partir del resultado — se decidió
+   así a propósito: `config.level` es una puerta de seguridad (palas, plantillas), no una
+   puntuación de forma física, y automatizarlo con el proxy actual (metros continuos en
+   crol) es arriesgado. Antes de tocarlo, ver el hueco de "nivel" más arriba.
 3. **Editor manual de sesiones**: `saveOverride` y `sessionsForWeek` ya existen; falta
    la interfaz.
 4. **Vídeo real por ejercicio**: hoy el enlace abre una *búsqueda* de YouTube. Es la
