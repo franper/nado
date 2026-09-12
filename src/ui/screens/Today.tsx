@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks'
-import { sessionMetres, sessionsForWeek } from '../../domain/generator'
+import { cyclePosition, sessionMetres, sessionsForWeek } from '../../domain/generator'
 import { kcal } from '../../domain/metrics'
 import { addLog, removeLog } from '../../domain/storage'
 import type { AppData, Effort, Lang, PlanBlock } from '../../domain/types'
@@ -28,7 +28,7 @@ export function Today({ data, lang }: { data: AppData; lang: Lang }) {
 
   const plan = data.plan
   const cycleWeeks = plan?.cycleWeeks ?? 8
-  const week = plan ? weekNumber(plan.startDate) : 1
+  const week = plan ? cyclePosition(weekNumber(plan.startDate), cycleWeeks) : 1
   const sessions = sessionsForWeek(config, week, cycleWeeks, data.overrides)
   const day = new Date().getDay()
   const todays = sessions.filter((s) => s.day === day)
@@ -55,7 +55,7 @@ export function Today({ data, lang }: { data: AppData; lang: Lang }) {
           class="mono"
           style="background:var(--card);border:1px solid var(--line);border-radius:var(--r-chip);padding:5px 11px;font-size:11px;font-weight:600;color:var(--accent);white-space:nowrap"
         >
-          {t(lang, 'weekOf', { n: Math.min(week, cycleWeeks), total: cycleWeeks })}
+          {t(lang, 'weekOf', { n: week, total: cycleWeeks })}
         </div>
       </div>
 

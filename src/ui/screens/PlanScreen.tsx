@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks'
-import { sessionMetres, sessionsForWeek } from '../../domain/generator'
+import { cyclePosition, sessionMetres, sessionsForWeek } from '../../domain/generator'
 import type { AppData, Lang, PlanBlock, PlanSession } from '../../domain/types'
 import { t } from '../../i18n'
 import { Card, Chip, Label } from '../components'
@@ -40,7 +40,7 @@ export function PlanScreen({ data, lang }: { data: AppData; lang: Lang }) {
 
   const plan = data.plan
   const cycleWeeks = plan?.cycleWeeks ?? 8
-  const week = plan ? weekNumber(plan.startDate) : 1
+  const week = plan ? cyclePosition(weekNumber(plan.startDate), cycleWeeks) : 1
   const sessions = sessionsForWeek(config, week, cycleWeeks, data.overrides)
   const byDay = new Map<number, PlanSession[]>()
   for (const s of sessions) {
@@ -60,10 +60,10 @@ export function PlanScreen({ data, lang }: { data: AppData; lang: Lang }) {
           <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px">
             <Label>{es ? 'Ciclo actual' : 'Current cycle'}</Label>
             <span class="mono" style="font-size:11px;color:var(--accent);font-weight:600">
-              {t(lang, 'weekOf', { n: Math.min(week, cycleWeeks), total: cycleWeeks })}
+              {t(lang, 'weekOf', { n: week, total: cycleWeeks })}
             </span>
           </div>
-          <WeekDots week={Math.min(week, cycleWeeks)} total={cycleWeeks} />
+          <WeekDots week={week} total={cycleWeeks} />
         </Card>
       </div>
 

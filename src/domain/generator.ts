@@ -80,6 +80,18 @@ export function weekFactor(week: number, cycleWeeks: number): number {
   return 0.85 + t * 0.35
 }
 
+/**
+ * Semana dentro del ciclo actual (1..cycleWeeks) para una semana transcurrida
+ * cualquiera. El ciclo se repite: al terminar cycleWeeks empieza uno nuevo
+ * desde la semana 1 (con test incluido), en vez de quedarse para siempre en
+ * la última semana de descarga.
+ */
+export function cyclePosition(week: number, cycleWeeks: number): number {
+  if (cycleWeeks <= 0) return 1
+  const w = Math.max(1, Math.floor(week))
+  return ((w - 1) % cycleWeeks) + 1
+}
+
 function scaleReps(reps: number, factor: number): number {
   return Math.max(1, Math.round(reps * factor))
 }
@@ -173,8 +185,11 @@ export function pickTemplates(config: Config, week: number): SessionTemplate[] {
 
 export function buildSessions(opts: BuildOptions): PlanSession[] {
   const { config } = opts
-  const week = opts.week ?? 1
   const cycleWeeks = opts.cycleWeeks ?? 8
+  // Se normaliza aquí para que una semana transcurrida más allá del ciclo
+  // (9, 17, 45…) vuelva a caer en 1..cycleWeeks en vez de congelarse en la
+  // última semana de descarga.
+  const week = cyclePosition(opts.week ?? 1, cycleWeeks)
   const factor =
     LEVEL_FACTOR[config.level] *
     (config.minutesPerSession / TEMPLATE_MINUTES) *

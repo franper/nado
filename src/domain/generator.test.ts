@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getExercise } from '../content/exercises'
 import {
   buildSessions,
+  cyclePosition,
   fitToPool,
   paddlesLocked,
   sessionMetres,
@@ -71,6 +72,43 @@ describe('weekFactor', () => {
   })
   it('descarga en la semana de cierre', () => {
     expect(weekFactor(8, 8)).toBeLessThan(weekFactor(7, 8))
+  })
+})
+
+describe('cyclePosition', () => {
+  it('deja igual las semanas dentro del ciclo', () => {
+    expect(cyclePosition(1, 8)).toBe(1)
+    expect(cyclePosition(7, 8)).toBe(7)
+    expect(cyclePosition(8, 8)).toBe(8)
+  })
+
+  it('rota a un nuevo ciclo en vez de congelarse en la última semana', () => {
+    expect(cyclePosition(9, 8)).toBe(1)
+    expect(cyclePosition(10, 8)).toBe(2)
+    expect(cyclePosition(16, 8)).toBe(8)
+    expect(cyclePosition(17, 8)).toBe(1)
+    expect(cyclePosition(45, 8)).toBe(cyclePosition(45 - 8 * 5, 8))
+  })
+})
+
+describe('rotación del ciclo en el plan generado', () => {
+  it('una semana muy avanzada produce el mismo plan que su equivalente dentro del ciclo', () => {
+    const config = makeConfig({})
+    const far = buildSessions({ config, week: 33, cycleWeeks: 8 }) // 33 -> semana 1 del ciclo 5
+    const equivalent = buildSessions({ config, week: 1, cycleWeeks: 8 })
+    expect(far).toEqual(equivalent)
+  })
+
+  it('vuelve a proponer el test al empezar un nuevo ciclo', () => {
+    const sessions = buildSessions({ config: makeConfig({}), week: 17, cycleWeeks: 8 })
+    expect(sessions[0]?.templateId).toBe('t-test')
+  })
+
+  it('no se queda para siempre en la semana de descarga', () => {
+    const config = makeConfig({})
+    const week8 = buildSessions({ config, week: 8, cycleWeeks: 8 })
+    const week10 = buildSessions({ config, week: 10, cycleWeeks: 8 }) // equivale a la semana 2
+    expect(sessionMetres(week10[0]!)).not.toBe(sessionMetres(week8[0]!))
   })
 })
 

@@ -4,7 +4,7 @@ import { generatePlan } from '../../domain/generator'
 import { exportJson, importJson, setConfig, setPlan, setTest, update } from '../../domain/storage'
 import type { AppData, Lang } from '../../domain/types'
 import { emptyData } from '../../domain/types'
-import { Button, Card, Label, Note } from '../components'
+import { Button, Card, Label, Note, Sheet } from '../components'
 import { isoOf, mondayOf } from '../shared'
 
 function download(text: string, filename: string): void {
@@ -34,6 +34,7 @@ export function Settings({
   const config = data.config
   const [msg, setMsg] = useState<string | null>(null)
   const [testInput, setTestInput] = useState('')
+  const [confirmErase, setConfirmErase] = useState(false)
   if (!config) return null
 
   const imc = bmi(config.weightKg, config.heightCm)
@@ -242,17 +243,36 @@ export function Settings({
           >
             {es ? 'Regenerar el plan' : 'Regenerate the plan'}
           </Button>
-          <Button
-            variant="danger"
-            onClick={() => {
-              update(() => emptyData())
-              setMsg(null)
-            }}
-          >
+          <Button variant="danger" onClick={() => setConfirmErase(true)}>
             {es ? 'Borrarlo todo y empezar de cero' : 'Erase everything and start over'}
           </Button>
         </Card>
       </div>
+
+      {confirmErase ? (
+        <Sheet title={es ? 'Borrar todo' : 'Erase everything'} onClose={() => setConfirmErase(false)}>
+          <p style="margin:0 0 16px;font-size:14px;line-height:1.55;color:var(--ink-2)">
+            {es
+              ? 'Esto borra tu configuración, tu plan, tus sesiones registradas y tu peso. Los datos solo viven en este móvil: si no has exportado una copia, no hay forma de recuperarlos.'
+              : 'This erases your setup, your plan, your logged sessions and your weight. Your data only lives on this phone: if you have not exported a backup, there is no way to get it back.'}
+          </p>
+          <Button
+            variant="danger"
+            onClick={() => {
+              update(() => emptyData())
+              setConfirmErase(false)
+              setMsg(null)
+            }}
+          >
+            {es ? 'Sí, borrarlo todo' : 'Yes, erase everything'}
+          </Button>
+          <div style="margin-top:8px">
+            <Button variant="ghost" onClick={() => setConfirmErase(false)}>
+              {es ? 'Cancelar' : 'Cancel'}
+            </Button>
+          </div>
+        </Sheet>
+      ) : null}
     </div>
   )
 }
