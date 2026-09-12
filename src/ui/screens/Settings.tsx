@@ -4,7 +4,7 @@ import { generatePlan } from '../../domain/generator'
 import { exportJson, importJson, setConfig, setPlan, setTest, update } from '../../domain/storage'
 import type { AppData, Lang } from '../../domain/types'
 import { emptyData } from '../../domain/types'
-import { Button, Card, Label, Note, Sheet } from '../components'
+import { Button, Card, Label, Note, Seg, Sheet } from '../components'
 import { isoOf, mondayOf } from '../shared'
 
 function download(text: string, filename: string): void {
@@ -108,6 +108,22 @@ export function Settings({
               <span class="mono" style="font-weight:600;text-align:right">{v}</span>
             </div>
           ))}
+          <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line-2)">
+            <Label>{es ? '¿Sabes nadar mariposa?' : 'Can you swim butterfly?'}</Label>
+            <Seg
+              value={config.knowsMariposa ? 'si' : 'no'}
+              onChange={(v) => setConfig({ ...config, knowsMariposa: v === 'si' })}
+              options={[
+                { value: 'no' as const, label: 'No' },
+                { value: 'si' as const, label: es ? 'Sí, aunque sea mal' : 'Yes, even if badly' },
+              ]}
+            />
+            <p style="margin:6px 0 0;font-size:11px;color:var(--ink-3);line-height:1.45">
+              {es
+                ? 'Es aparte de tu nivel. Confirmándolo aquí se desbloquea en la rotación de estilos.'
+                : 'Separate from your level. Confirming it here unlocks it in the stroke rotation.'}
+            </p>
+          </div>
           <div style="margin-top:12px">
             <Button
               variant="ghost"

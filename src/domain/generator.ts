@@ -2,7 +2,7 @@ import { getExercise } from '../content/exercises'
 import type { BlockSpec, SessionTemplate } from '../content/templates'
 import { FALLBACK_TEMPLATE, RECIPES, TEMPLATE_BY_ID, TEMPLATES } from '../content/templates'
 import type { Config, Equipment, LevelId, Plan, PlanBlock, PlanSession, PoolLength } from './types'
-import { levelAtLeast } from './types'
+import { levelAtLeast, levelAtMost } from './types'
 
 /** Cuánto volumen soporta cada nivel respecto de la plantilla, medida a nivel medio. */
 const LEVEL_FACTOR: Record<LevelId, number> = {
@@ -45,10 +45,12 @@ export function resolveExercise(
   available: Equipment[],
   level: LevelId,
   week: number,
+  knowsMariposa: boolean,
 ): string | null {
   const ok = (id: string): boolean => {
     const ex = getExercise(id)
     if (ex.equipment !== null && !available.includes(ex.equipment)) return false
+    if (ex.requiresMariposaConfirmed && !knowsMariposa) return false
     return levelAtLeast(level, ex.minLevel)
   }
 
@@ -195,7 +197,7 @@ function buildOneBlock(
   n: number,
   scaleFixed = false,
 ): PlanBlock | null {
-  const exerciseId = resolveExercise(spec, available, config.level, week)
+  const exerciseId = resolveExercise(spec, available, config.level, week, config.knowsMariposa ?? false)
   if (exerciseId === null) return null
 
   const ex = getExercise(exerciseId)
@@ -268,7 +270,12 @@ export function pickTemplates(config: Config, week: number): SessionTemplate[] {
   const recipe = RECIPES[config.goal]
   const allowed = recipe
     .map((id) => TEMPLATE_BY_ID.get(id))
-    .filter((t): t is SessionTemplate => !!t && levelAtLeast(config.level, t.minLevel))
+    .filter(
+      (t): t is SessionTemplate =>
+        !!t &&
+        levelAtLeast(config.level, t.minLevel) &&
+        (t.maxLevel === undefined || levelAtMost(config.level, t.maxLevel)),
+    )
 
   const pool = allowed.length > 0
     ? allowed

@@ -44,6 +44,12 @@ export interface Exercise {
    * en el lado contrario a que gane una repetición o un largo de propina.
    */
   neverAmplify?: boolean
+  /**
+   * Exige que el usuario haya confirmado que sabe nadar mariposa
+   * (`Config.knowsMariposa`) — el nivel por sí solo no lo acredita, mide
+   * forma física en crol, no si conoces este estilo.
+   */
+  requiresMariposaConfirmed?: boolean
   es: ExerciseText
   en: ExerciseText
 }
@@ -457,6 +463,62 @@ export const EXERCISES: Exercise[] = [
     },
   }),
   E({
+    id: 'fuerte-controlado',
+    equipment: null,
+    tags: ['intervalos'],
+    minLevel: 'inicio',
+    es: {
+      name: 'Series cortas a ritmo fuerte controlado',
+      query: 'series cortas 25 metros natacion principiante ritmo fuerte tecnica',
+      detail: [
+        'Montaje. Un largo por repetición, saliendo siempre desde la pared, nunca en marcha. El descanso que marca la app es parte del ejercicio: espéralo entero aunque te veas con fuerzas antes. En piscina de 50 m la app te dará repeticiones de 50 porque no hay pared a mitad de calle: haz fuerte solo la ida hasta la mitad —en muchas piscinas el corcho cambia de color justo ahí— y vuelve muy suave hasta la pared, sin parar. No hagas los 50 enteros fuertes.',
+        'Ejecución. Fuerte, pero no a tope. La referencia es llegar a la pared respirando por la boca y pudiendo decir dos o tres palabras seguidas; si no puedes decir ninguna, te has pasado. La brazada tiene que seguir siendo larga: ir más rápido aquí es empujar más agua hacia atrás, no mover los brazos más deprisa.',
+        'Error típico. Salir a muerte en las dos primeras y arrastrarse el resto. Todas las repeticiones deberían salirte casi iguales, y la última como mucho un poco más lenta que la primera. Si la primera te sale mucho más rápida que las demás, ese no era tu ritmo.',
+        'Regla de parada. En cuanto un largo te salga descompuesto —el brazo entra golpeando, las piernas se paran, tragas agua, pierdes la respiración—, esa ha sido la última repetición fuerte del día. Las que queden las haces suaves y no pasa absolutamente nada: este bloque solo entrena mientras la técnica aguanta; por debajo de eso solo entrena nadar mal.',
+        'Qué debes notar. Que llegas respirando fuerte y que, antes de salir otra vez, ya has recuperado casi del todo. Si te toca salir todavía ahogado, el descanso se te ha quedado corto: alárgalo 10 o 15 segundos y quita una repetición del final.',
+      ],
+    },
+    en: {
+      name: 'Short controlled hard repeats',
+      query: 'short 25m swim repeats beginner controlled hard effort technique',
+      detail: [
+        'Set-up. One length per repeat, always pushing off the wall, never starting mid-pool. The rest the app gives you is part of the exercise: take all of it, even if you feel ready sooner. In a 50 m pool the app will give you 50 m repeats because there is no wall halfway: swim hard only out to the midpoint — in many pools the lane rope changes colour exactly there — and come back very easy to the wall without stopping. Never swim the full 50 hard.',
+        'Execution. Hard, but not flat out. The reference is reaching the wall breathing through your mouth and still able to say two or three words; if you can’t say any, you overcooked it. The stroke has to stay long: going faster here means pushing more water back, not moving your arms quicker.',
+        'Common mistake. Killing yourself on the first two and dragging through the rest. Every repeat should come out almost the same, the last one at most slightly slower than the first. If the first is much faster than the others, that wasn’t your pace.',
+        'Stop rule. The moment a length comes out ragged — the hand slapping in, the legs stopping, swallowing water, losing your breathing — that was the last hard repeat of the day. Do the ones that are left easy and think nothing of it: this block only trains you while the stroke holds; below that it only trains swimming badly.',
+        'What you should feel. That you arrive breathing hard and that, before the next repeat, you have almost fully recovered. If you have to start while still gasping, the rest is too short: add 10 or 15 seconds and drop a repeat off the end.',
+      ],
+    },
+  }),
+  E({
+    id: 'brazadas-contadas',
+    equipment: null,
+    tags: ['tecnica', 'intervalos'],
+    minLevel: 'inicio',
+    es: {
+      name: 'Largos con brazadas contadas',
+      query: 'contar brazadas por largo natacion eficiencia crol',
+      detail: [
+        'Montaje. No necesitas nada más que contar. El primer largo lo haces a ritmo cómodo y cuentas las brazadas: una cada vez que una mano entra en el agua. Ese número es tu referencia de hoy.',
+        'Ejecución. En los largos siguientes intentas repetir el MISMO número de brazadas, pero llegando un poco antes. No más brazadas: las mismas, mejor aprovechadas. Para conseguirlo, empuja hasta pasar el muslo y estírate un instante más en cada entrada de mano.',
+        'Error típico. Bracear más rápido para llegar antes. Eso sube el número de brazadas y el ejercicio deja de medir nada: si el número sube, has ido a peor aunque el largo te haya salido más rápido.',
+        'Qué debes notar. Que la velocidad extra sale de empujar más atrás, no de mover los brazos más deprisa. Es incómodo al principio, porque obliga a esperar el deslizamiento justo cuando el cuerpo te pide acelerar.',
+        'Para qué sirve. Es tu referencia de ritmo mientras todavía no puedes sostener una velocidad constante en 100 m. Bajar dos brazadas por largo en unas semanas, al mismo ritmo, es una mejora real y medible — y no necesitas ni cronómetro ni test para verla.',
+      ],
+    },
+    en: {
+      name: 'Counted-stroke lengths',
+      query: 'stroke count per length freestyle efficiency swim golf',
+      detail: [
+        'Set-up. Nothing but counting. Swim the first length at a comfortable pace and count your strokes: one every time a hand enters the water. That number is today’s reference.',
+        'Execution. On the following lengths you try to repeat the SAME stroke count, but arriving slightly sooner. Not more strokes: the same ones, better used. To do it, push past your thigh and hold the stretch a fraction longer on every hand entry.',
+        'Common mistake. Turning the arms over faster to get there sooner. That pushes the stroke count up and the drill stops measuring anything: if the number goes up you went backwards, even if the length was quicker.',
+        'What you should feel. That the extra speed comes from pushing further back, not from faster arms. It feels awkward at first, because it asks you to wait for the glide exactly when your body wants to rush.',
+        'Why. It is your pace reference while you still can’t hold a steady speed over 100 m. Dropping two strokes per length over a few weeks, at the same pace, is a real, measurable improvement — and you need neither a stopwatch nor a test to see it.',
+      ],
+    },
+  }),
+  E({
     id: 'cambios-ritmo',
     equipment: null,
     tags: ['intervalos', 'continuo'],
@@ -634,8 +696,12 @@ export const EXERCISES: Exercise[] = [
     id: 'mariposa-tecnica',
     equipment: null,
     tags: ['tecnica'],
-    minLevel: 'avanzado',
+    // El nivel mide forma física en crol, no si sabes nadar mariposa —
+    // la puerta real es requiresMariposaConfirmed. basico como suelo
+    // mínimo de comodidad en el agua, nada más.
+    minLevel: 'basico',
     neverAmplify: true,
+    requiresMariposaConfirmed: true,
     es: {
       name: 'Mariposa: nado corto',
       query: 'mariposa natacion tecnica series cortas',

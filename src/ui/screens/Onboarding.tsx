@@ -15,20 +15,20 @@ function mondayIso(d = new Date()): string {
 
 const GOAL_COPY: Record<Goal, { es: [string, string]; en: [string, string] }> = {
   grasa: {
-    es: ['Perder grasa', 'Más sesiones de intervalos y gasto alto. Ojo: lo decide el déficit de comida, no la piscina.'],
-    en: ['Lose fat', 'More intervals and higher burn. Careful: the calorie deficit decides it, not the pool.'],
+    es: ['Perder grasa', 'La sesión más intensa de la semana y el mayor gasto por sesión. Ojo: lo decide el déficit de comida, no la piscina.'],
+    en: ['Lose fat', 'The week’s hardest session and the highest burn per session. Careful: the calorie deficit decides it, not the pool.'],
   },
   fondo: {
     es: ['Ganar fondo', 'Nadar más tiempo sin ahogarte. Volumen progresivo y respiración.'],
     en: ['Build endurance', 'Swim longer without gasping. Progressive volume and breathing.'],
   },
   tecnica: {
-    es: ['Mejorar la técnica', 'Menos metros y más ejercicios. Para quien se cansa por técnica, no por forma física.'],
-    en: ['Improve technique', 'Fewer metres, more drills. For people limited by technique, not fitness.'],
+    es: ['Mejorar la técnica', 'Más ejercicios de técnica y menos nado duro. Para quien se cansa por técnica, no por forma física.'],
+    en: ['Improve technique', 'More drills and less hard swimming. For people limited by technique, not fitness.'],
   },
   rendimiento: {
-    es: ['Rendimiento', 'Series por ritmos a partir del test. Pide nadar ya con soltura.'],
-    en: ['Performance', 'Pace-based sets from your test. Assumes you already swim comfortably.'],
+    es: ['Rendimiento', 'Series por ritmos calculados con tu test de 400. Los ritmos exactos entran a partir de nivel medio; por debajo, el plan trabaja la intensidad que sí puedes sostener.'],
+    en: ['Performance', 'Sets at paces worked out from your 400 m test. Exact paces start at intermediate level; below that the plan trains the intensity you can actually hold.'],
   },
   tono: {
     es: ['Fuerza y tono', 'Brazos y cadera en el agua, más un bloque en seco. El tono lo construye el bloque en seco, no el agua.'],
@@ -86,12 +86,13 @@ export function Onboarding({ lang, onCancel }: { lang: Lang; onCancel: () => voi
   const [breathEvery, setBreathEvery] = useState<2 | 3 | 4>(3)
   const [weightKg, setWeightKg] = useState(75)
   const [heightCm, setHeightCm] = useState(175)
+  const [knowsMariposa, setKnowsMariposa] = useState(false)
 
   const level: LevelId = CONTINUOUS.find((c) => c.value === continuous)?.level ?? 'basico'
 
   const config: Config = {
     goal, days, minutesPerSession: minutes, equipment, pool,
-    level, continuous, breathEvery, weightKg, heightCm, lang,
+    level, continuous, breathEvery, weightKg, heightCm, lang, knowsMariposa,
   }
 
   const es = lang === 'es'
@@ -254,6 +255,22 @@ export function Onboarding({ lang, onCancel }: { lang: Lang; onCancel: () => voi
           <div style="margin-top:22px">
             <Label>{es ? 'Metros que aguantas sin parar' : 'Metres you can swim without stopping'}</Label>
             <Seg value={continuous} onChange={(v) => setContinuous(v)} options={CONTINUOUS.map((c) => ({ value: c.value, label: c.label }))} />
+          </div>
+          <div style="margin-top:20px">
+            <Label>{es ? '¿Sabes nadar mariposa?' : 'Can you swim butterfly?'}</Label>
+            <Seg
+              value={knowsMariposa ? 'si' : 'no'}
+              onChange={(v) => setKnowsMariposa(v === 'si')}
+              options={[
+                { value: 'no' as const, label: es ? 'No' : 'No' },
+                { value: 'si' as const, label: es ? 'Sí, aunque sea mal' : 'Yes, even if badly' },
+              ]}
+            />
+            <p style="margin:7px 0 0;font-size:11.5px;color:var(--ink-3);line-height:1.45">
+              {es
+                ? 'Es aparte de tu nivel: aguantar metros de crol no dice nada sobre si conoces este estilo. Solo se desbloquea si lo confirmas tú.'
+                : 'This is separate from your level: swimming distance in freestyle says nothing about knowing this stroke. It only unlocks if you confirm it.'}
+            </p>
           </div>
           <div style="margin-top:20px">
             <Label>{es ? 'Respiras cada' : 'You breathe every'}</Label>

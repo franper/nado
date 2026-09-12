@@ -32,6 +32,10 @@ export function levelAtLeast(level: LevelId, min: LevelId): boolean {
   return LEVEL_ORDER.indexOf(level) >= LEVEL_ORDER.indexOf(min)
 }
 
+export function levelAtMost(level: LevelId, max: LevelId): boolean {
+  return LEVEL_ORDER.indexOf(level) <= LEVEL_ORDER.indexOf(max)
+}
+
 /** Cuánto aguanta nadando sin parar. Entrada objetiva, no autoevaluación. */
 export type ContinuousMetres = 'lt50' | 'm50_200' | 'm200_600' | 'gt600'
 
@@ -62,6 +66,14 @@ export interface Config {
   weightKg: number
   heightCm: number
   lang: Lang
+  /**
+   * El usuario confirma que sabe nadar mariposa, aunque sea con mala
+   * técnica. El nivel (metros continuos en crol) no acredita esto — mide
+   * forma física en crol, no si conoces un estilo distinto. Opcional para
+   * que un documento guardado antes de este campo siga funcionando
+   * (se lee como `false` si falta).
+   */
+  knowsMariposa?: boolean
 }
 
 /** Resultado del test de 400 m, del que salen los ritmos. */

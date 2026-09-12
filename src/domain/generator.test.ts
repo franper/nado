@@ -17,6 +17,7 @@ import {
 } from './generator'
 import { kcal, pacePer100, formatTime, targetTime, paceChangePercent } from './metrics'
 import type { Config, Equipment, Goal, LevelId, PoolLength } from './types'
+import { LEVEL_ORDER } from './types'
 
 const GOALS: Goal[] = ['grasa', 'fondo', 'tecnica', 'rendimiento', 'tono']
 const LEVELS: LevelId[] = ['inicio', 'basico', 'medio', 'avanzado']
@@ -211,6 +212,83 @@ describe('las recetas no pierden contenido al añadir t-estilos', () => {
   })
 })
 
+/**
+ * Instantánea del pool de plantillas de cada objetivo en cada nivel. Es la
+ * red que faltaba: hasta ahora, gatear una plantilla por nivel podía vaciar
+ * un objetivo entero en silencio (`grasa` y `rendimiento` a nivel inicio se
+ * quedaron sin ninguna sesión de intensidad, y `tono` sin apenas nada en el
+ * agua, sin que fallara un solo test). Si cambias RECIPES o un
+ * minLevel/maxLevel a conciencia, actualiza la tabla; si salta sin que lo
+ * esperaras, es un objetivo que ha perdido contenido.
+ */
+const EXPECTED_POOLS: Record<string, string[]> = {
+  'grasa/inicio': ['t-base', 't-arranque', 't-continuo', 't-estilos'],
+  'grasa/basico': ['t-intervalos', 't-base', 't-fuerza-agua', 't-continuo', 't-estilos'],
+  'grasa/medio': ['t-intervalos', 't-base', 't-fuerza-agua', 't-continuo', 't-estilos'],
+  'grasa/avanzado': ['t-intervalos', 't-base', 't-fuerza-agua', 't-continuo', 't-estilos'],
+  'fondo/inicio': ['t-base', 't-continuo', 't-estilos', 't-continuo'],
+  'fondo/basico': ['t-base', 't-continuo', 't-estilos', 't-intervalos', 't-continuo'],
+  'fondo/medio': ['t-base', 't-continuo', 't-estilos', 't-intervalos', 't-continuo'],
+  'fondo/avanzado': ['t-base', 't-continuo', 't-estilos', 't-intervalos', 't-continuo'],
+  'tecnica/inicio': ['t-tecnica', 't-base', 't-estilos', 't-continuo', 't-base'],
+  'tecnica/basico': ['t-tecnica', 't-base', 't-estilos', 't-continuo', 't-base'],
+  'tecnica/medio': ['t-tecnica', 't-base', 't-estilos', 't-continuo', 't-base'],
+  'tecnica/avanzado': ['t-tecnica', 't-base', 't-estilos', 't-continuo', 't-base'],
+  'rendimiento/inicio': ['t-base', 't-arranque', 't-continuo', 't-estilos'],
+  'rendimiento/basico': ['t-base', 't-intervalos', 't-continuo', 't-estilos'],
+  'rendimiento/medio': ['t-ritmos', 't-base', 't-intervalos', 't-continuo', 't-estilos'],
+  'rendimiento/avanzado': ['t-ritmos', 't-base', 't-intervalos', 't-continuo', 't-estilos'],
+  'tono/inicio': ['t-seco', 't-cadera', 't-base', 't-seco', 't-estilos'],
+  'tono/basico': ['t-fuerza-agua', 't-seco', 't-cadera', 't-base', 't-seco', 't-estilos'],
+  'tono/medio': ['t-fuerza-agua', 't-seco', 't-cadera', 't-base', 't-seco', 't-estilos'],
+  'tono/avanzado': ['t-fuerza-agua', 't-seco', 't-cadera', 't-base', 't-seco', 't-estilos'],
+}
+
+describe('lo que cada objetivo recibe de verdad, nivel a nivel', () => {
+  // Se piden tantos días como entradas tiene el pool esperado: pedir más
+  // haría que `pickTemplates` cicle sobre el pool filtrado (`pool[i %
+  // pool.length]`) y repita el principio para rellenar — un wraparound
+  // real y correcto, pero no lo que esta prueba quiere comprobar.
+  // week: 2, no 1, porque la semana 1 sobrescribe el índice 0 con el test.
+  const poolOf = (goal: Goal, level: LevelId, days: number): string[] =>
+    pickTemplates(makeConfig({ goal, level, days: [1, 2, 3, 4, 5, 6].slice(0, days) }), 2).map((t) => t.id)
+
+  it('el pool de cada objetivo/nivel es el esperado', () => {
+    for (const [key, expected] of Object.entries(EXPECTED_POOLS)) {
+      const [goal, level] = key.split('/') as [Goal, LevelId]
+      expect(poolOf(goal, level, expected.length), key).toEqual(expected)
+    }
+  })
+
+  it('grasa y rendimiento tienen intensidad real en TODOS los niveles', () => {
+    for (const goal of ['grasa', 'rendimiento'] as Goal[]) {
+      for (const level of LEVEL_ORDER) {
+        for (const days of [2, 3, 4, 5]) {
+          for (const week of [1, 2, 4, 8]) {
+            const config = makeConfig({ goal, level, days: [1, 2, 3, 4, 5].slice(0, days) })
+            const ss = pickTemplates(config, week)
+            const duras = ss.filter((s) => s.intensity === 'firme' || s.intensity === 'fuerte')
+            expect(duras.length, `${goal}/${level} ${days}d w${week}: sin sesión de intensidad`).toBeGreaterThan(0)
+          }
+        }
+      }
+    }
+  })
+
+  it('tono nunca da más sesiones en seco que en el agua', () => {
+    for (const level of LEVEL_ORDER) {
+      for (const days of [2, 3, 4, 5]) {
+        for (const week of [1, 2, 4, 8]) {
+          const config = makeConfig({ goal: 'tono', level, days: [1, 2, 3, 4, 5].slice(0, days) })
+          const ss = pickTemplates(config, week)
+          const seco = ss.filter((s) => s.kind === 'seco').length
+          expect(seco * 2, `tono/${level} ${days}d w${week}`).toBeLessThanOrEqual(days)
+        }
+      }
+    }
+  })
+})
+
 describe('exactMetres exime de verdad del ajuste de pared', () => {
   const fakeTemplate = (exactMetres: boolean): SessionTemplate => ({
     id: 't-fake',
@@ -250,7 +328,7 @@ describe('neverAmplify: mariposa y ondulación nunca ganan volumen por la pared'
   })
 
   it('mariposa-tecnica con una distancia impar en largos no se amplía', () => {
-    const config = makeConfig({ pool: 50, level: 'avanzado' })
+    const config = makeConfig({ pool: 50, level: 'avanzado', knowsMariposa: true })
     const blocks = buildBlocks(fakeTemplate('mariposa-tecnica'), config, 1, 'x', 3)
     expect(blocks[0]!.metres).toBe(150) // 150/50 = 3, impar, pero se queda así
   })
@@ -273,18 +351,45 @@ describe('styleRotation es estable frente a cambios de material', () => {
   }
 
   it('quitar material no cambia semanas cuyo candidato ideal no lo necesitaba', () => {
-    const conAletas = resolveExercise(spec, ['aletas'], 'basico', 1)
-    const sinAletas = resolveExercise(spec, [], 'basico', 1)
+    const conAletas = resolveExercise(spec, ['aletas'], 'basico', 1, false)
+    const sinAletas = resolveExercise(spec, [], 'basico', 1, false)
     expect(conAletas).toBe(sinAletas) // la semana 1 no tocaba 'ondulacion'
   })
 
   it('quitar material solo cambia la semana que sí dependía de él', () => {
     // Con la lista completa, la semana 3 le toca 'ondulacion' (pide aletas).
-    const conAletas = resolveExercise(spec, ['aletas'], 'basico', 3)
+    const conAletas = resolveExercise(spec, ['aletas'], 'basico', 3, false)
     expect(conAletas).toBe('ondulacion')
-    const sinAletas = resolveExercise(spec, [], 'basico', 3)
+    const sinAletas = resolveExercise(spec, [], 'basico', 3, false)
     expect(sinAletas).not.toBe('ondulacion')
     expect(sinAletas).not.toBeNull()
+  })
+})
+
+describe('mariposa exige confirmación aparte del nivel', () => {
+  const spec: BlockSpec = {
+    exerciseId: 'crol-medio',
+    styleRotation: ['mariposa-tecnica'],
+    reps: 4,
+    metres: 25,
+    restSeconds: 25,
+    intensity: 'medio',
+  }
+
+  it('nivel avanzado, sin confirmar mariposa, no la desbloquea', () => {
+    const r = resolveExercise(spec, [], 'avanzado', 1, false)
+    expect(r).not.toBe('mariposa-tecnica')
+    expect(r).toBe('crol-medio') // cae al ejercicio base, no deja un hueco
+  })
+
+  it('confirmando mariposa, con nivel suficiente, sí se desbloquea', () => {
+    const r = resolveExercise(spec, [], 'basico', 1, true)
+    expect(r).toBe('mariposa-tecnica')
+  })
+
+  it('confirmar mariposa no basta si el nivel no llega (suelo: básico)', () => {
+    const r = resolveExercise(spec, [], 'inicio', 1, true)
+    expect(r).not.toBe('mariposa-tecnica')
   })
 })
 

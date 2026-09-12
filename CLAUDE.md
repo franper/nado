@@ -10,7 +10,7 @@ En vivo: https://franper.github.io/nado/ · Repo: franper/nado
 
 ```bash
 npm run dev      # servidor de desarrollo
-npm test         # vitest, 56 tests. Debe estar verde antes de cualquier push
+npm test         # vitest, 64 tests. Debe estar verde antes de cualquier push
 npm run build    # tsc -b --noEmit && vite build
 ```
 
@@ -28,8 +28,8 @@ Sin librería de estilos: tokens CSS en `src/styles/tokens.css` y estilos en lí
 ## Arquitectura
 
 ```
-src/content/exercises.ts   25 ejercicios bilingües. El activo real del producto
-src/content/templates.ts   10 plantillas de sesión + RECIPES (plantillas por objetivo)
+src/content/exercises.ts   27 ejercicios bilingües. El activo real del producto
+src/content/templates.ts   11 plantillas de sesión + RECIPES (plantillas por objetivo)
 src/domain/generator.ts    escala, sustituye material, reescribe a la piscina y a la pared
 src/domain/metrics.ts      kcal por MET, ritmos derivados del test, % de cambio entre tests
 src/domain/storage.ts      localStorage clave 'nado', con DATA_VERSION y migrate()
@@ -110,15 +110,85 @@ mirar los dos juntos, no por separado.
 
 **Huecos de contenido conocidos:** `t-seco` es un único bloque fijo (declarado 25 min,
 sin progresión de una semana a otra) y es justo la sesión que sostiene el objetivo
-"tono"; el ritmo objetivo exige nivel `medio`, así que el principiante no recibe
-referencia de velocidad; el ciclo 2 es idéntico al 1 (mismas plantillas, mismo arranque
-de volumen) — `t-estilos` rota de estilo semana a semana dentro de un ciclo, pero esa
-rotación también se repite igual en el ciclo siguiente; y el plan no reacciona a cómo
-fue la sesión, solo al número de semana y al nivel. El nivel del usuario (`config.level`)
-se deriva solo de metros continuos en crol y con eso se decide si desbloquea mariposa o
-palas — es un proxy conservador para las palas, pero no acredita nada sobre si alguien
-sabe nadar mariposa. Antes de automatizar cualquier subida de nivel, hace falta una
-pregunta aparte sobre qué estilos conoce el usuario.
+"tono"; `rendimiento/basico` no tiene ningún trabajo de ritmo (`ritmo-objetivo` exige
+nivel `medio` y además tiene `reps: 8` fijo, así que sus metros nunca escalan hacia
+abajo — el gateo es correcto, el texto de `GOAL_COPY` ya lo avisa con el badge "nivel
+medio" y con el texto actual); y el ciclo 2 es idéntico al 1 (mismas plantillas, mismo
+arranque de volumen) — el plan no reacciona a cómo fue la sesión, solo al número de
+semana y al nivel.
+
+**Dos agujeros sistémicos medidos, sin arreglar** (misma familia que el de abajo, pero
+no son de `GOAL_COPY` — son del generador):
+- **Los metros por repetición nunca escalan con el nivel cuando `reps > 1`** (solo
+  escalan las repeticiones, `buildOneBlock`). Medido en piscina de 25 m, nivel `inicio`
+  (`continuous: 'lt50'`, no aguanta 50 m seguidos): `t-base` da `crol-medio 4×75` (75 m
+  seguidos), `t-tecnica` da `bilateral 3×50`, `t-continuo` da `pull-brazos 4×50` —
+  repeticiones por encima de la distancia continua que define ese nivel, en los 5
+  objetivos. Es el mismo fallo que el de las plantillas gateadas, en dirección
+  contraria: aquí no falta intensidad, sobra distancia por tramo.
+- **En piscina de 50 m, `fitToPool` dobla toda repetición de 25 m — a cualquier
+  nivel.** A nivel `inicio` produce `crol-medio 3×100`, `espalda-tecnica 2×50`,
+  `braza-tecnica 2×50`. `exactMetres` no lo evita (solo salta `fitToWall`, no
+  `fitToPool`); haría falta un flag tipo `maxRepMetres` en `BlockSpec`. `t-arranque`
+  (nuevo, ver más abajo) lo resuelve solo en el texto de `fuerte-controlado`
+  (instrucción de nadar fuerte hasta la mitad y volver suave); el resto del catálogo
+  sigue con este agujero.
+- `t-cadera` sin aletas y sin tabla se queda en 3 bloques (calentamiento + `crol-medio`
+  + calma) — ya pasaba en `basico` y ahora, al bajar `t-cadera` a nivel `inicio`,
+  también afecta a `tono/inicio` con ese material.
+- `tono/inicio` con 2-3 días pierde el bloque en seco en la semana 1, porque `t-seco`
+  cae en el índice 0 del pool filtrado y el test de esa semana lo sobrescribe. Es 1
+  semana de 8 y no se tocó el orden de la receta de `tono` para arreglarlo: cualquier
+  reordenación que lo evite cambia los pools de `basico+`, que es justo lo que este
+  cambio garantiza que no pasa (ver test "el pool de cada objetivo/nivel es el
+  esperado" en `generator.test.ts`).
+- En piscina de 50 m y 30 min, `t-arranque` suma ~900 m — no cabe en el tiempo elegido.
+  Es el agujero de "nadie comprueba que la sesión quepa" que ya está documentado arriba
+  (56-69 %); `t-arranque` no lo empeora ni lo mejora, hereda el mismo `LEVEL_FACTOR`.
+
+**Ya resueltos** (estaban aquí como "pendiente, no es un arreglo de una tarde" y se
+hicieron):
+- ***`grasa` y `rendimiento` sin ninguna sesión de intensidad a nivel `inicio`.*** Medido:
+  antes, `grasa/inicio` y `rendimiento/inicio` generaban el plan **idéntico** —
+  `[t-base, t-continuo, t-estilos]`, mismas kcal, mismos metros— que alguien que hubiera
+  elegido "ganar fondo", contradiciendo lo que el propio onboarding promete
+  (`GOAL_COPY`: "más intervalos", "series por ritmos"). Causa: `t-intervalos` y
+  `t-fuerza-agua` exigen `minLevel: 'basico'`, y a nivel `inicio` `pickTemplates` las
+  filtra **enteras** de la receta, no las suaviza. Arreglo: plantilla nueva `t-arranque`
+  (rampa, `maxLevel: 'inicio'`, se retira sola en `basico`) con dos ejercicios nuevos —
+  `fuerte-controlado` (series de 25 m a esfuerzo fuerte-controlado, con regla explícita
+  de parar si la técnica se rompe; nunca sprints al máximo) y `brazadas-contadas`
+  (referencia de ritmo por conteo de brazadas, sin depender de un test de 400). Nivel
+  mínimo `inicio` en los dos: el gateo por seguridad de `t-intervalos`/`t-fuerza-agua`
+  seguía correcto (sprint al máximo y tirón resistido no son para quien no controla la
+  técnica de crol), lo que faltaba era el peldaño de abajo, no bajar el gateo existente.
+  `RECIPES` de `grasa` y `rendimiento` llevan `t-arranque` en la 3ª posición a propósito
+  (queda en el índice 1 del pool filtrado a nivel inicio: entra con 2 días, nunca en el
+  índice 0 que la semana 1 sobrescribe con el test).
+- ***`tono/inicio` con más sesiones en seco que en el agua.*** Medido: antes, el pool
+  filtrado a nivel `inicio` era `[t-seco, t-base, t-seco]` — dos sesiones en seco por
+  una sola en el agua, 1050 m y 726 kcal a la semana (la mitad que cualquier otro
+  objetivo), contradiciendo el propio `GOAL_COPY` ("brazos y cadera en el agua, más un
+  bloque en seco"). Causa: `t-cadera` exigía `minLevel: 'basico'`, heredado de sus
+  ejercicios (`ondulacion`, `patada-vertical`), no una decisión propia de la plantilla —
+  los dos ejercicios ya degradan solos por su propio `minLevel`. Arreglo: `t-cadera`
+  baja a `minLevel: 'inicio'`. De propina, se invirtió el orden de los `fallbacks` de
+  `patada-espalda` dentro de `t-cadera` (antes coincidía con los de `ondulacion` y, a
+  nivel inicio sin aletas, los dos bloques caían en el mismo ejercicio de repuesto).
+- *Un estilo por semana enseña poco* → `t-estilos` (`templates.ts`) ya no rota una sola
+  posición entre 5-6 candidatos (una vez cada mes y medio). Ahora tiene **dos bloques
+  garantizados** (espalda y braza, siempre los dos) más uno opcional de nivel avanzado
+  que cae a `crol-medio` si no aplica. Lo que rota semana a semana es el énfasis dentro
+  de cada estilo (técnica ↔ continuo), no si aparece o no.
+- *El nivel no acredita mariposa* → `mariposa-tecnica` ya no depende de
+  `minLevel: avanzado` (medía forma física en crol, no si conoces el estilo). Ahora
+  exige `Exercise.requiresMariposaConfirmed` + `Config.knowsMariposa`, una pregunta
+  aparte y explícita (paso 4 del onboarding, y también en Ajustes para quien ya pasó
+  por el onboarding antes de este cambio). El nivel sigue poniendo un suelo (`basico`),
+  pero ya no es el único criterio.
+- `Config.knowsMariposa` es opcional (`?: boolean`) precisamente para que un documento
+  guardado sin este campo (usuarios de antes de este cambio) siga funcionando sin
+  migración — se lee como `false` por defecto, igual que `TestResult.metres`.
 
 ## Actualización en el móvil
 

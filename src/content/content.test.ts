@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { LEVEL_ORDER } from '../domain/types'
 import { EXERCISE_BY_ID, EXERCISES } from './exercises'
 import { FALLBACK_TEMPLATE, RECIPES, TEMPLATE_BY_ID, TEMPLATES } from './templates'
 
@@ -73,6 +74,30 @@ describe('integridad del catálogo de contenido', () => {
     for (const t of TEMPLATES) {
       expect(t.nameEs.trim(), `${t.id}.nameEs`).not.toBe('')
       expect(t.nameEn.trim(), `${t.id}.nameEn`).not.toBe('')
+    }
+  })
+
+  it('maxLevel, si existe, no es menor que minLevel', () => {
+    for (const t of TEMPLATES) {
+      if (t.maxLevel === undefined) continue
+      expect(
+        LEVEL_ORDER.indexOf(t.maxLevel) >= LEVEL_ORDER.indexOf(t.minLevel),
+        `${t.id}: maxLevel "${t.maxLevel}" por debajo de minLevel "${t.minLevel}"`,
+      ).toBe(true)
+    }
+  })
+
+  it('toda plantilla de una receta es alcanzable en algún nivel', () => {
+    for (const [goal, ids] of Object.entries(RECIPES)) {
+      for (const id of ids) {
+        const t = TEMPLATE_BY_ID.get(id)!
+        const reachable = LEVEL_ORDER.some(
+          (lvl) =>
+            LEVEL_ORDER.indexOf(lvl) >= LEVEL_ORDER.indexOf(t.minLevel) &&
+            (t.maxLevel === undefined || LEVEL_ORDER.indexOf(lvl) <= LEVEL_ORDER.indexOf(t.maxLevel)),
+        )
+        expect(reachable, `${goal}: "${id}" no se alcanza en ningún nivel`).toBe(true)
+      }
     }
   })
 })
