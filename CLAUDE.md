@@ -10,7 +10,7 @@ En vivo: https://franper.github.io/nado/ · Repo: franper/nado
 
 ```bash
 npm run dev      # servidor de desarrollo
-npm test         # vitest, 51 tests. Debe estar verde antes de cualquier push
+npm test         # vitest, 56 tests. Debe estar verde antes de cualquier push
 npm run build    # tsc -b --noEmit && vite build
 ```
 
@@ -120,18 +120,23 @@ palas — es un proxy conservador para las palas, pero no acredita nada sobre si
 sabe nadar mariposa. Antes de automatizar cualquier subida de nivel, hace falta una
 pregunta aparte sobre qué estilos conoce el usuario.
 
-## Actualización en el móvil (problema activo)
+## Actualización en el móvil
 
-`registerType: 'prompt'` pero **nadie llama a `updateSW()`**: no hay ningún
-`import 'virtual:pwa-register'`. El `sw.js` solo ejecuta `skipWaiting()` al recibir un
-mensaje `SKIP_WAITING` que nadie envía. Consecuencia: al publicar, el service worker
-nuevo se queda esperando y la versión vieja sigue sirviendo hasta que se cierran todas
-las ventanas del origen. En iOS hay que cerrar la app desde el selector y abrirla dos
-veces. Es el mismo fallo que ocultó una caída de Pages en el proyecto dos-calles.
+**Hecho** (era "problema activo"): `registerType: 'autoUpdate'` (`vite.config.ts`), con
+`registerSW()` en `App.tsx` — al detectar una versión nueva se activa sola y recarga,
+sin banner ni botón. Se comprueba al volver del segundo plano (`visibilitychange`, el
+momento que más importa: es cuando alguien reabre una PWA instalada días después) y,
+de propina, cada hora si se queda en primer plano. El número de versión (de
+`package.json`, inyectado por `define: { __APP_VERSION__ }` en `vite.config.ts`) se ve
+al final de Ajustes — sube ese número antes de cada release que quieras identificar así.
 
-**Arreglo acordado:** pasar a `autoUpdate`, añadir el número de versión visible en
-Ajustes y comprobar actualizaciones también al volver al primer plano
-(`visibilitychange`). Cuando haya usuarios ajenos, volver a `prompt` **con** su aviso.
+Antes tenía `registerType: 'prompt'` sin que nadie llamara a `updateSW()`: el service
+worker nuevo se quedaba esperando para siempre. Y aunque se hubiera llamado, un banner
+manual de "hay actualización" es poco fiable en una PWA añadida a la pantalla de inicio
+en iOS — de ahí la decisión de ir a `autoUpdate` directamente en vez de arreglar el
+banner. **Cuando haya usuarios ajenos** (no solo los 1-2 de confianza actuales), sí
+merece la pena volver a `prompt` con su propio aviso, porque un recargado sin avisar en
+mitad de una sesión de otro usuario es peor experiencia que unos segundos de banner.
 
 ## Datos del usuario: riesgos reales
 
@@ -156,8 +161,14 @@ Ajustes y comprobar actualizaciones también al volver al primer plano
 
 ## Pendiente de implementar
 
-1. **"Hoy no puedo"**: recortar la sesión a 25–30 min en un toque. Estaba en el diseño
-   aprobado y sigue sin hacerse. Es lo que salva el día en que llegas tarde.
+1. **"Hoy no puedo" — hecho.** `trimSession()` en `generator.ts` recorta la sesión de
+   hoy a menos tiempo y/o resuelve sin el material que hoy no tienes, reutilizando
+   `buildOneBlock` (la misma pieza que la generación semanal, factorizada para esto). A
+   diferencia de la generación normal, aquí sí escalan los bloques `fixed`
+   (calentamiento, vuelta a la calma) — no hay minutos que perder en un tamaño fijo
+   cuando el tiempo ya es poco. El enlace vive bajo cada sesión de piscina en `Today.tsx`
+   (`TrimSheet`), y "Usar esta versión" llama a `saveOverride()` — el mecanismo de
+   overrides que ya existía y no tenía interfaz (ver punto 3, ahora parcialmente hecho).
 2. **Re-test al cerrar el ciclo**: la semana 8 baja el volumen a 0,8 y el ciclo nuevo
    vuelve a proponer el test en su semana 1 (`t-test`), y si el usuario lo repite ahora
    ve en Progreso cómo cambió su ritmo frente al ciclo anterior (`paceCompareText` en
@@ -167,8 +178,10 @@ Ajustes y comprobar actualizaciones también al volver al primer plano
    así a propósito: `config.level` es una puerta de seguridad (palas, plantillas), no una
    puntuación de forma física, y automatizarlo con el proxy actual (metros continuos en
    crol) es arriesgado. Antes de tocarlo, ver el hueco de "nivel" más arriba.
-3. **Editor manual de sesiones**: `saveOverride` y `sessionsForWeek` ya existen; falta
-   la interfaz.
+3. **Editor manual de sesiones**: `saveOverride`/`sessionsForWeek` ya tienen un primer
+   consumidor real (el "Hoy no puedo" del punto 1), pero solo para recortar tiempo/
+   material — sigue sin existir una interfaz para editar un bloque suelto a mano
+   (cambiar una distancia, quitar un ejercicio concreto sin más contexto).
 4. **Vídeo real por ejercicio**: hoy el enlace abre una *búsqueda* de YouTube. Es la
    carencia más visible para un usuario que pague.
 5. **Multiperfil**: dos personas compartiendo un juego de material sin coincidir en el

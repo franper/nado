@@ -173,6 +173,74 @@ export interface BuildOptions {
   cycleWeeks?: number
 }
 
+/**
+ * Construye un único bloque a partir de su especificación, o `null` si no
+ * hay ejercicio válido (sin material ni alternativa). Aislado de
+ * `buildBlocks` para que `trimSession` pueda reutilizar exactamente la
+ * misma lógica de escalado/encaje sin duplicarla.
+ *
+ * `scaleFixed`: en la generación semanal normal, los bloques `fixed`
+ * (calentamiento, vuelta a la calma) nunca escalan — mantienen su tamaño
+ * de diseño pase lo que pase. En un recorte de "hoy no puedo con esto" sí
+ * interesa que encojan como el resto: no hay 5 minutos que perder en un
+ * calentamiento de tamaño fijo cuando solo hay 20 minutos en total.
+ */
+function buildOneBlock(
+  spec: BlockSpec,
+  config: Config,
+  factor: number,
+  available: Equipment[],
+  week: number,
+  idPrefix: string,
+  n: number,
+  scaleFixed = false,
+): PlanBlock | null {
+  const exerciseId = resolveExercise(spec, available, config.level, week)
+  if (exerciseId === null) return null
+
+  const ex = getExercise(exerciseId)
+  let reps = spec.reps
+  let metres = spec.metres
+  let rest = spec.restSeconds
+  let seconds = spec.seconds
+
+  if (!spec.fixed || scaleFixed) {
+    if (metres > 0 && reps > 1) reps = scaleReps(reps, factor)
+    else if (metres > 0) metres = scaleMetres(metres, factor, config.pool)
+    else if (seconds !== undefined) seconds = Math.max(10, Math.round(seconds * factor))
+    else reps = scaleReps(reps, factor)
+  }
+
+  if (metres > 0) {
+    const fitted = fitToPool(reps, metres, rest, config.pool)
+    reps = fitted.reps
+    metres = fitted.metres
+    rest = fitted.restSeconds
+
+    // Los estilos más exigentes de hombro (mariposa) o de fatiga (ondulación
+    // con aletas) no deben ganar volumen solo para volver a la pared: para
+    // esos, el ajuste se salta y el bloque puede, en algún caso raro,
+    // quedar en el lado contrario — un mal menor frente a añadir más
+    // mariposa de la prescrita.
+    if (!spec.exactMetres && !ex.neverAmplify) {
+      const walled = fitToWall(reps, metres, config.pool, spec.reps > 1)
+      reps = walled.reps
+      metres = walled.metres
+    }
+  }
+
+  return {
+    id: `${idPrefix}-b${n}`,
+    exerciseId,
+    reps,
+    metres,
+    ...(seconds !== undefined ? { seconds } : {}),
+    restSeconds: rest,
+    equipment: ex.equipment,
+    intensity: spec.intensity,
+  }
+}
+
 export function buildBlocks(
   template: SessionTemplate,
   config: Config,
@@ -185,49 +253,10 @@ export function buildBlocks(
   let n = 0
 
   for (const spec of template.blocks) {
-    const exerciseId = resolveExercise(spec, available, config.level, week)
-    if (exerciseId === null) continue
-
-    const ex = getExercise(exerciseId)
-    let reps = spec.reps
-    let metres = spec.metres
-    let rest = spec.restSeconds
-
-    if (!spec.fixed) {
-      if (metres > 0 && reps > 1) reps = scaleReps(reps, factor)
-      else if (metres > 0) metres = scaleMetres(metres, factor, config.pool)
-      else reps = scaleReps(reps, factor)
-    }
-
-    if (metres > 0) {
-      const fitted = fitToPool(reps, metres, rest, config.pool)
-      reps = fitted.reps
-      metres = fitted.metres
-      rest = fitted.restSeconds
-
-      // Los estilos más exigentes de hombro (mariposa) o de fatiga (ondulación
-      // con aletas) no deben ganar volumen solo para volver a la pared: para
-      // esos, el ajuste se salta y el bloque puede, en algún caso raro,
-      // quedar en el lado contrario — un mal menor frente a añadir más
-      // mariposa de la prescrita.
-      if (!spec.exactMetres && !ex.neverAmplify) {
-        const walled = fitToWall(reps, metres, config.pool, spec.reps > 1)
-        reps = walled.reps
-        metres = walled.metres
-      }
-    }
-
+    const block = buildOneBlock(spec, config, factor, available, week, idPrefix, n + 1)
+    if (block === null) continue
     n += 1
-    blocks.push({
-      id: `${idPrefix}-b${n}`,
-      exerciseId,
-      reps,
-      metres,
-      ...(spec.seconds !== undefined ? { seconds: spec.seconds } : {}),
-      restSeconds: rest,
-      equipment: ex.equipment,
-      intensity: spec.intensity,
-    })
+    blocks.push(block)
   }
 
   return blocks
@@ -332,3 +361,66 @@ export function sessionsForWeek(
 }
 
 export const ALL_TEMPLATE_IDS = TEMPLATES.map((t) => t.id)
+
+/** Un bloque antes/después de recortar la sesión de hoy. `null` = no existía o se ha quitado. */
+export interface TrimmedBlock {
+  before: PlanBlock | null
+  after: PlanBlock | null
+}
+
+export interface TrimResult {
+  /** La sesión recortada, lista para guardarse como override de hoy. */
+  session: PlanSession
+  /** Los bloques originales y los nuevos, en el mismo orden, para pintar el antes/después. */
+  blocks: TrimmedBlock[]
+}
+
+/**
+ * "Hoy no puedo con esto": recorta una sesión ya generada a los minutos
+ * disponibles hoy, y/o resuelve sin el material que hoy no tienes a mano.
+ * No es una regeneración normal — es un ajuste puntual de un solo día, así
+ * que aquí sí escalan los bloques `fixed` (calentamiento, vuelta a la
+ * calma): no hay minutos que perder en un tamaño fijo cuando el tiempo
+ * disponible ya es poco.
+ *
+ * Se reconstruye desde la plantilla en vez de recortar `session.blocks`
+ * directamente, para que "antes" y "después" salgan alineados bloque a
+ * bloque incluso si alguno se cae por falta de material.
+ */
+export function trimSession(
+  session: PlanSession,
+  config: Config,
+  targetMinutes: number,
+  unavailableToday: Equipment[],
+  week: number,
+  cycleWeeks: number,
+): TrimResult {
+  const template = TEMPLATE_BY_ID.get(session.templateId)
+  if (!template) return { session, blocks: [] }
+
+  const weekF = weekFactor(week, cycleWeeks)
+  const baseFactor = LEVEL_FACTOR[config.level] * (config.minutesPerSession / TEMPLATE_MINUTES) * weekF
+  const trimFactor = LEVEL_FACTOR[config.level] * (targetMinutes / TEMPLATE_MINUTES) * weekF
+
+  const normalAvailable = usableEquipment(config)
+  const trimAvailable = normalAvailable.filter((e) => !unavailableToday.includes(e))
+
+  const blocks: TrimmedBlock[] = []
+  const newBlocks: PlanBlock[] = []
+  let n = 0
+
+  template.blocks.forEach((spec, i) => {
+    const before = buildOneBlock(spec, config, baseFactor, normalAvailable, week, session.id, i + 1)
+    const after = buildOneBlock(spec, config, trimFactor, trimAvailable, week, session.id, n + 1, true)
+    if (after !== null) {
+      n += 1
+      newBlocks.push(after)
+    }
+    blocks.push({ before, after })
+  })
+
+  return {
+    session: { ...session, minutes: targetMinutes, blocks: newBlocks },
+    blocks,
+  }
+}

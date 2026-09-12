@@ -11,6 +11,7 @@ import {
   pickTemplates,
   resolveExercise,
   sessionMetres,
+  trimSession,
   usableEquipment,
   weekFactor,
 } from './generator'
@@ -284,6 +285,51 @@ describe('styleRotation es estable frente a cambios de material', () => {
     const sinAletas = resolveExercise(spec, [], 'basico', 3)
     expect(sinAletas).not.toBe('ondulacion')
     expect(sinAletas).not.toBeNull()
+  })
+})
+
+describe('trimSession: "hoy no puedo con esto"', () => {
+  const config = makeConfig({ goal: 'grasa', level: 'basico', pool: 25, minutesPerSession: 60, equipment: ['aletas', 'pull'] })
+  const week = 3
+  const cycleWeeks = 8
+  const session = buildSessions({ config, week, cycleWeeks }).find((s) => s.kind === 'piscina')!
+
+  it('recorta el total de metros al reducir los minutos', () => {
+    const full = sessionMetres(session)
+    const { session: trimmed } = trimSession(session, config, 30, [], week, cycleWeeks)
+    expect(trimmed.minutes).toBe(30)
+    expect(sessionMetres(trimmed)).toBeLessThan(full)
+  })
+
+  it('a diferencia de la generación normal, los bloques fijos SÍ encogen', () => {
+    const { blocks } = trimSession(session, config, 20, [], week, cycleWeeks)
+    const calentamiento = blocks.find((b) => b.before?.exerciseId === 'calentamiento')
+    expect(calentamiento?.before).toBeTruthy()
+    expect(calentamiento?.after).toBeTruthy()
+    expect(calentamiento!.after!.metres).toBeLessThan(calentamiento!.before!.metres)
+  })
+
+  it('marcar material como no disponible hoy cambia el ejercicio resuelto, sin tocar la config guardada', () => {
+    const { session: trimmed } = trimSession(session, config, config.minutesPerSession, ['aletas'], week, cycleWeeks)
+    for (const b of trimmed.blocks) {
+      expect(getExercise(b.exerciseId).equipment).not.toBe('aletas')
+    }
+    expect(config.equipment).toContain('aletas') // la config del usuario no se ha tocado
+  })
+
+  it('los bloques resultantes siguen cumpliendo la invariante de la pared', () => {
+    const { session: trimmed } = trimSession(session, config, 20, ['aletas'], week, cycleWeeks)
+    for (const b of trimmed.blocks) {
+      if (b.metres === 0) continue
+      if (getExercise(b.exerciseId).neverAmplify) continue
+      expect((b.reps * b.metres) % (2 * config.pool)).toBe(0)
+    }
+  })
+
+  it('antes y después quedan alineados igual, tenga o no material disponible', () => {
+    const { blocks: conMaterial } = trimSession(session, config, 60, [], week, cycleWeeks)
+    const { blocks: sinMaterial } = trimSession(session, config, 60, ['aletas', 'pull'], week, cycleWeeks)
+    expect(sinMaterial.length).toBe(conMaterial.length)
   })
 })
 

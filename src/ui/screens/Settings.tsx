@@ -144,7 +144,7 @@ export function Settings({
               aria-label={es ? 'Tiempo, minutos y segundos' : 'Time, minutes and seconds'}
               value={testInput}
               onInput={(e) => setTestInput((e.target as HTMLInputElement).value)}
-              style="flex:1;background:var(--card-2);border:1px solid var(--line);border-radius:10px;padding:11px 12px;font-size:16px;font-weight:600"
+              style="flex:1;min-width:0;background:var(--card-2);border:1px solid var(--line);border-radius:10px;padding:11px 12px;font-size:16px;font-weight:600"
             />
             <input
               class="mono"
@@ -154,15 +154,11 @@ export function Settings({
               aria-label={es ? 'Metros nadados' : 'Metres swum'}
               value={testMetres}
               onInput={(e) => setTestMetres((e.target as HTMLInputElement).value)}
-              style="width:64px;flex:none;background:var(--card-2);border:1px solid var(--line);border-radius:10px;padding:11px 8px;font-size:16px;font-weight:600;text-align:center"
+              style="width:58px;flex:none;background:var(--card-2);border:1px solid var(--line);border-radius:10px;padding:11px 6px;font-size:16px;font-weight:600;text-align:center"
             />
-            <button
-              type="button"
-              onClick={saveTest}
-              style="flex:none;background:var(--accent);color:var(--card);border:0;border-radius:10px;padding:11px 18px;font-size:14px;font-weight:700;cursor:pointer"
-            >
-              {es ? 'Guardar' : 'Save'}
-            </button>
+          </div>
+          <div style="margin-top:8px">
+            <Button onClick={saveTest}>{es ? 'Guardar' : 'Save'}</Button>
           </div>
         </Card>
       </div>
@@ -266,6 +262,10 @@ export function Settings({
           </Button>
         </Card>
       </div>
+
+      <p class="mono" style="margin:18px 0 4px;font-size:11px;color:var(--ink-3);text-align:center">
+        Nado v{__APP_VERSION__}
+      </p>
 
       {confirmErase ? (
         <Sheet title={es ? 'Borrar todo' : 'Erase everything'} onClose={() => setConfirmErase(false)}>

@@ -1,4 +1,4 @@
-import { useEffect, useErrorBoundary, useRef, useState } from 'preact/hooks'
+import { useEffect, useErrorBoundary, useState } from 'preact/hooks'
 import { registerSW } from 'virtual:pwa-register'
 import { detectLang, t } from '../i18n'
 import { load, subscribe } from '../domain/storage'
@@ -43,57 +43,39 @@ function Crash({ error, onReset, lang }: { error: unknown; onReset: () => void; 
   )
 }
 
-/**
- * Aviso de que hay una versión nueva. Con `registerType: 'prompt'` el service
- * worker nuevo se queda esperando en segundo plano hasta que alguien llama a
- * `updateSW(true)` — si nadie lo hace, ningún arreglo llega jamás al móvil.
- */
-function UpdateBanner({ lang, onUpdate }: { lang: Lang; onUpdate: () => void }) {
-  const es = lang === 'es'
-  return (
-    <div style="position:fixed;left:0;right:0;bottom:calc(66px + env(safe-area-inset-bottom,0px) + 10px);z-index:35;display:flex;justify-content:center;padding:0 16px">
-      <div style="max-width:34rem;width:100%;background:var(--accent-deep);color:var(--card);border-radius:14px;padding:11px 12px 11px 15px;display:flex;align-items:center;gap:12px;box-shadow:0 6px 20px rgba(16,21,24,.25)">
-        <span style="flex:1;font-size:13px;font-weight:600;line-height:1.35">
-          {es ? 'Hay una versión nueva de Nado.' : 'A new version of Nado is available.'}
-        </span>
-        <button
-          type="button"
-          onClick={onUpdate}
-          style="flex:none;background:var(--card);color:var(--accent-deep);border:0;border-radius:9px;padding:9px 13px;font-size:13px;font-weight:700;cursor:pointer"
-        >
-          {es ? 'Actualizar' : 'Update'}
-        </button>
-      </div>
-    </div>
-  )
-}
-
 export function App() {
   const [data, setData] = useState<AppData>(() => load())
   const [lang, setLang] = useState<Lang>(() => load().config?.lang ?? detectLang())
   const [tab, setTab] = useState<TabId>('hoy')
   const [error, resetError] = useErrorBoundary()
-  const [needRefresh, setNeedRefresh] = useState(false)
-  const updateSWRef = useRef<((reloadPage?: boolean) => Promise<void>) | null>(null)
 
   useEffect(() => subscribe(setData), [])
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return
-    updateSWRef.current = registerSW({
-      onNeedRefresh() {
-        setNeedRefresh(true)
-      },
+    // 'autoUpdate' (vite.config.ts): al detectar una versión nueva, se
+    // activa sola y recarga la página — no hace falta ningún banner ni
+    // botón. Lo único que hace falta es comprobar a menudo, porque una PWA
+    // instalada se puede quedar abierta (o en segundo plano, sin recargar)
+    // durante días.
+    registerSW({
       onRegisteredSW(_url, reg) {
         if (!reg) return
-        // El service worker solo se comprueba al recargar; para una PWA que
-        // la gente deja abierta días enteros, hay que forzar la comprobación
-        // de vez en cuando o nunca se entera de que hay algo nuevo.
         const check = (): void => {
           reg.update().catch(() => {})
         }
+        // Al volver de segundo plano es el momento que más importa: es
+        // justo cuando alguien reabre la app días después de instalarla.
+        const onVisible = (): void => {
+          if (document.visibilityState === 'visible') check()
+        }
+        document.addEventListener('visibilitychange', onVisible)
+        // Y de propina, cada hora si se queda con la app abierta en primer plano.
         const id = setInterval(check, 60 * 60 * 1000)
-        window.addEventListener('beforeunload', () => clearInterval(id))
+        window.addEventListener('beforeunload', () => {
+          clearInterval(id)
+          document.removeEventListener('visibilitychange', onVisible)
+        })
       },
     })
   }, [])
@@ -107,20 +89,9 @@ export function App() {
     document.title = t(lang, 'appName')
   }, [lang])
 
-  const onUpdate = (): void => {
-    updateSWRef.current?.(true)
-  }
-
   if (error) return <Crash error={error} onReset={resetError} lang={lang} />
 
-  if (!data.config) {
-    return (
-      <>
-        <Welcome lang={lang} onLang={setLang} />
-        {needRefresh ? <UpdateBanner lang={lang} onUpdate={onUpdate} /> : null}
-      </>
-    )
-  }
+  if (!data.config) return <Welcome lang={lang} onLang={setLang} />
 
   const labels: Record<TabId, string> = {
     hoy: t(lang, 'tabToday'),
@@ -137,7 +108,6 @@ export function App() {
         {tab === 'prog' ? <Progress data={data} lang={lang} /> : null}
         {tab === 'ajustes' ? <Settings data={data} lang={lang} onLang={setLang} /> : null}
       </div>
-      {needRefresh ? <UpdateBanner lang={lang} onUpdate={onUpdate} /> : null}
       <TabBar active={tab} onChange={setTab} labels={labels} />
     </>
   )

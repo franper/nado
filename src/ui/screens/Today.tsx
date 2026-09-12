@@ -1,11 +1,147 @@
 import { useState } from 'preact/hooks'
-import { cyclePosition, sessionMetres, sessionsForWeek } from '../../domain/generator'
+import { getExercise } from '../../content/exercises'
+import { cyclePosition, sessionMetres, sessionsForWeek, trimSession, type TrimmedBlock } from '../../domain/generator'
 import { kcal } from '../../domain/metrics'
-import { addLog, removeLog } from '../../domain/storage'
-import type { AppData, Effort, Lang, PlanBlock } from '../../domain/types'
+import { addLog, removeLog, saveOverride } from '../../domain/storage'
+import type { AppData, Config, Effort, Equipment, Lang, PlanBlock, PlanSession } from '../../domain/types'
 import { t } from '../../i18n'
-import { Button, Card, Chip, Label, Seg } from '../components'
-import { BlockRow, DAY_NAMES, DAY_INDEX, ExerciseSheet, isoToday, weekNumber } from '../shared'
+import { Button, Card, Chip, Label, Seg, Sheet } from '../components'
+import { BlockRow, DAY_NAMES, DAY_INDEX, ExerciseSheet, blockSize, isoToday, weekNumber } from '../shared'
+
+const EQUIP_LABEL: Record<Equipment, { es: string; en: string }> = {
+  aletas: { es: 'Aletas', en: 'Fins' },
+  pull: { es: 'Pull-buoy', en: 'Pull buoy' },
+  tabla: { es: 'Tabla', en: 'Kickboard' },
+  tubo: { es: 'Tubo frontal', en: 'Snorkel' },
+  palas: { es: 'Palas', en: 'Paddles' },
+}
+
+/** Tres opciones de menos tiempo que el normal, redondeadas a múltiplos de 5. */
+function trimOptions(normalMinutes: number): number[] {
+  const opts = [0.33, 0.5, 0.75]
+    .map((f) => Math.max(10, Math.round((normalMinutes * f) / 5) * 5))
+    .filter((m) => m < normalMinutes)
+  return [...new Set(opts)]
+}
+
+function TrimSheet({
+  session,
+  config,
+  week,
+  cycleWeeks,
+  lang,
+  onClose,
+  onUse,
+}: {
+  session: PlanSession
+  config: Config
+  week: number
+  cycleWeeks: number
+  lang: Lang
+  onClose: () => void
+  onUse: (trimmed: PlanSession) => void
+}) {
+  const es = lang === 'es'
+  const options = trimOptions(session.minutes)
+  const [minutes, setMinutes] = useState<number>(options[options.length - 1] ?? session.minutes)
+  const [missing, setMissing] = useState<Equipment[]>([])
+
+  const toggle = (e: Equipment): void => {
+    setMissing((m) => (m.includes(e) ? m.filter((x) => x !== e) : [...m, e]))
+  }
+
+  const result = trimSession(session, config, minutes, missing, week, cycleWeeks)
+  const metres = sessionMetres(result.session)
+
+  const changedLine = (diff: TrimmedBlock, i: number) => {
+    if (!diff.after) {
+      const name = diff.before ? getExercise(diff.before.exerciseId)[lang].name : ''
+      return (
+        <div key={i} style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;font-size:13px;border-top:1px solid var(--line-2);color:var(--ink-3);text-decoration:line-through">
+          <span>{name}</span>
+          <span class="mono" style="font-size:11px">{es ? 'quitado' : 'removed'}</span>
+        </div>
+      )
+    }
+    const ex = getExercise(diff.after.exerciseId)
+    const size = blockSize(diff.after)
+    const changedExercise = diff.before?.exerciseId !== diff.after.exerciseId
+    const changedSize = diff.before && (diff.before.reps !== diff.after.reps || diff.before.metres !== diff.after.metres)
+    const before = diff.before ? blockSize(diff.before) : ''
+    return (
+      <div key={i} style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;font-size:13px;border-top:1px solid var(--line-2)">
+        <span style="font-weight:600">
+          {ex[lang].name}
+          {size ? ` · ${size}` : ''}
+        </span>
+        {changedExercise ? (
+          <span class="mono" style="font-size:11px;color:var(--ink-3)">{es ? 'sin material' : 'no equipment'}</span>
+        ) : changedSize ? (
+          <span class="mono" style="font-size:11px;color:var(--ink-3)">{es ? 'era ' : 'was '}{before}</span>
+        ) : null}
+      </div>
+    )
+  }
+
+  return (
+    <Sheet title={es ? 'Hoy no puedo con esto' : "Can't do this today"} onClose={onClose}>
+      <p style="margin:0 0 16px;font-size:13px;color:var(--ink-2);line-height:1.5">
+        {es
+          ? 'Dime qué ha cambiado y recorto la sesión respetando su estructura. No la pierdes, se adapta.'
+          : 'Tell me what changed and I trim the session, keeping its structure. You do not lose it, it adapts.'}
+      </p>
+
+      <Label>{es ? 'Tiempo disponible' : 'Time available'}</Label>
+      <Seg
+        value={minutes}
+        onChange={setMinutes}
+        options={options.map((m) => ({ value: m, label: `${m} min` }))}
+      />
+
+      {config.equipment.length > 0 ? (
+        <div style="margin-top:16px">
+          <Label>{es ? 'Material que hoy no tienes' : "Equipment you don't have today"}</Label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            {config.equipment.map((e) => (
+              <button
+                key={e}
+                type="button"
+                class="mono"
+                onClick={() => toggle(e)}
+                style={`text-align:center;padding:9px 12px;border-radius:10px;font-size:12.5px;font-weight:600;cursor:pointer;background:var(--card);${
+                  missing.includes(e) ? 'border:2px solid var(--accent);color:var(--accent)' : 'border:1px solid var(--line);color:var(--ink-3)'
+                }`}
+              >
+                {EQUIP_LABEL[e][lang]}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <div style="margin-top:18px;background:var(--card-2);border-radius:14px;padding:14px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+          <Label>{es ? 'Sesión recortada' : 'Trimmed session'}</Label>
+          <span class="mono" style="font-size:11px;color:var(--ink-3)">
+            {metres > 0 ? `${metres} m · ` : ''}{result.session.minutes} min
+          </span>
+        </div>
+        {result.blocks.map((b, i) => changedLine(b, i))}
+      </div>
+
+      <div style="margin-top:14px">
+        <Button
+          onClick={() => {
+            onUse(result.session)
+            onClose()
+          }}
+        >
+          {es ? 'Usar esta versión' : 'Use this version'}
+        </Button>
+      </div>
+    </Sheet>
+  )
+}
 
 function dayName(lang: Lang, day: number): string {
   return DAY_NAMES[lang][DAY_INDEX.indexOf(day)] ?? ''
@@ -21,6 +157,7 @@ function nextLine(lang: Lang, next: { day: number; name: string }): string {
 export function Today({ data, lang }: { data: AppData; lang: Lang }) {
   const [effort, setEffort] = useState<Effort>('normal')
   const [open, setOpen] = useState<PlanBlock | null>(null)
+  const [trimFor, setTrimFor] = useState<PlanSession | null>(null)
   const config = data.config
   const es = lang === 'es'
 
@@ -144,12 +281,35 @@ export function Today({ data, lang }: { data: AppData; lang: Lang }) {
                   </Button>
                 )}
               </div>
+
+              {s.kind === 'piscina' ? (
+                <div style="margin-top:10px;text-align:center">
+                  <button
+                    type="button"
+                    onClick={() => setTrimFor(s)}
+                    style="background:none;border:0;padding:6px;font-size:13px;color:var(--accent);font-weight:600;text-decoration:underline;text-underline-offset:3px;cursor:pointer"
+                  >
+                    {es ? 'Hoy no puedo con esto' : "Can't do this today"}
+                  </button>
+                </div>
+              ) : null}
             </Card>
           </div>
         )
       })}
 
       {open ? <ExerciseSheet block={open} lang={lang} onClose={() => setOpen(null)} /> : null}
+      {trimFor ? (
+        <TrimSheet
+          session={trimFor}
+          config={config}
+          week={week}
+          cycleWeeks={cycleWeeks}
+          lang={lang}
+          onClose={() => setTrimFor(null)}
+          onUse={(trimmed) => saveOverride(trimmed)}
+        />
+      ) : null}
     </div>
   )
 }
